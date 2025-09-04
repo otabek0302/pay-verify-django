@@ -1,19 +1,20 @@
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_"
+SECRET_KEY = os.environ.get('SECRET_KEY', "django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']  # Allow all hosts for development
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Hikvision Terminal Settings
-HIK_VISITOR_EMPLOYEE_NO = "VISITOR"  # Single visitor user for all QR cards
+HIK_VISITOR_EMPLOYEE_NO = os.environ.get('HIK_VISITOR_EMPLOYEE_NO', 'VISITOR')
 
 
 # Application definition
@@ -81,8 +82,12 @@ WSGI_APPLICATION = "controller.wsgi.application"
 # Database
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get('POSTGRES_DB', 'payverify'),
+        "USER": os.environ.get('POSTGRES_USER', 'payverify'),
+        "PASSWORD": os.environ.get('POSTGRES_PASSWORD', 'payverify'),
+        "HOST": os.environ.get('POSTGRES_HOST', 'localhost'),
+        "PORT": os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
 

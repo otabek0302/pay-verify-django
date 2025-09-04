@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: payverify_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-payverify}
+      POSTGRES_USER: ${POSTGRES_USER:-payverify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payverify}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payverify} -d ${POSTGRES_DB:-payverify}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [ pvnet ]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payverify_web
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-payverify}
+      - POSTGRES_USER=${POSTGRES_USER:-payverify}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-payverify}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      - HIK_VISITOR_EMPLOYEE_NO=${HIK_VISITOR_EMPLOYEE_NO:-VISITOR}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      gunicorn controller.wsgi:application --bind 0.0.0.0:8000 --workers 3
+      "
+    ports:
+      - "8000:8000"
+    volumes:
+      - static_volume:/app/static
+    networks: [ pvnet ]
+
+volumes:
+  pgdata:
+  static_volume:
+
+networks:
+  pvnet:
+    driver: bridge
