@@ -167,9 +167,9 @@ function submitEditPatient(event) {
     .then(data => {
         if (data.success) {
             showMessage(data.message, 'success');
-            closeEditPatientModal();
-            // Update the table row
+            // Update the table row BEFORE closing modal
             updatePatientRow(currentPatientId, data.patient);
+            closeEditPatientModal();
         } else {
             showMessage(data.message, 'error');
         }
