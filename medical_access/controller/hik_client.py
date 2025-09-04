@@ -122,13 +122,20 @@ class HikClient:
         }
         
         # Binding card with provided payload
+        if r.status_code == 200:
+            r.raise_for_status()
+            return True
+        else:
+            r.raise_for_status()
+            return False
 
         # Use POST method (which worked in our test)
         r = requests.post(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
         
         if r.status_code != 200:
             # Card binding failed - log error
-        
+            r.raise_for_status()
+            return False
         r.raise_for_status()
         return True
 
