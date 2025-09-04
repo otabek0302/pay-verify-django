@@ -22,6 +22,15 @@
    - Web: http://localhost:8000
    - Admin: http://localhost:8000/admin
 
+## Dependencies
+
+This project uses `requirements.txt` for dependency management. If you need to update dependencies:
+
+```bash
+# Generate new requirements.txt from Pipfile
+pipenv requirements > requirements.txt
+```
+
 ## Environment Variables
 
 | Variable | Default | Description |

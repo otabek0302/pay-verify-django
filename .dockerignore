@@ -63,3 +63,7 @@ test_*.py
 Dockerfile
 docker-compose.yml
 .dockerignore
+
+# Pipenv (using requirements.txt instead)
+Pipfile
+Pipfile.lock

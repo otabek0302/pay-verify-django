@@ -7,14 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install pipenv (since repo uses Pipfile)
-RUN pip install --no-cache-dir pipenv
-
-# Copy Pipfile first
-COPY Pipfile Pipfile.lock /app/
+# Copy requirements first
+COPY requirements.txt /app/
 
 # Install dependencies
-RUN PIPENV_VENV_IN_PROJECT=0 pipenv install --system --deploy
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . /app
