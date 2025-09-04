@@ -41,10 +41,10 @@ def qr_verify(request):
                 'message': 'No card number provided'
             }, status=400)
         
-        # Find active appointment
+        # Find appointment (active or used)
         now = timezone.now()
         try:
-            # First try to find appointment with valid time range
+            # First try to find active appointment with valid time range
             appointment = Appointment.objects.filter(
                 card_no=card_no,
                 status='active'
@@ -54,27 +54,47 @@ def qr_verify(request):
             ).first()
             
             if not appointment:
-                # If no appointment found with time range, try without time constraints
-                appointment = Appointment.objects.get(
+                # If no active appointment found with time range, try without time constraints
+                appointment = Appointment.objects.filter(
                     card_no=card_no,
                     status='active'
+                ).first()
+            
+            if not appointment:
+                # If no active appointment found, check if there's a used appointment (already scanned)
+                appointment = Appointment.objects.filter(
+                    card_no=card_no,
+                    status='used'
+                ).first()
+                
+                if appointment:
+                    # Return success for already used appointment (prevent multiple scans)
+                    logger.info(f"[QR VERIFY] ✅ Access granted for already used card {card_no}")
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'Access granted (already used)',
+                        'cardNo': card_no,
+                        'employeeNo': f"APT{appointment.id}"
+                    })
+            
+            # Only update status if appointment is active
+            if appointment.status == 'active':
+                appointment.status = 'used'
+                appointment.used_at = now
+                appointment.save()
+                
+                # Create access event
+                AccessEvent.objects.create(
+                    appointment=appointment,
+                    door=None,  # Will be set by event listener
+                    result=AccessEvent.Result.ALLOW,
+                    reason='Valid QR code scanned',
+                    card_no=card_no
                 )
-            
-            # Update appointment status to 'used' when QR is scanned
-            appointment.status = 'used'
-            appointment.used_at = now
-            appointment.save()
-            
-            # Create access event
-            AccessEvent.objects.create(
-                appointment=appointment,
-                door=None,  # Will be set by event listener
-                result=AccessEvent.Result.ALLOW,
-                reason='Valid QR code scanned',
-                card_no=card_no
-            )
-            
-            logger.info(f"[QR VERIFY] ✅ Access granted for card {card_no}, appointment {appointment.id} marked as used")
+                
+                logger.info(f"[QR VERIFY] ✅ Access granted for card {card_no}, appointment {appointment.id} marked as used")
+            else:
+                logger.info(f"[QR VERIFY] ✅ Access granted for already used card {card_no}")
             
             return JsonResponse({
                 'status': 'success',
