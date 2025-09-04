@@ -128,6 +128,7 @@
         </div>
     </div>
 </div>
+<div id="message" class="message" style="display: none;"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -259,9 +260,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update the table row
                     const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
                     if (row) {
-                        row.querySelector('.doctors-table-cell--first-name').textContent = data.doctor.first_name;
-                        row.querySelector('.doctors-table-cell--last-name').textContent = data.doctor.last_name;
-                        row.querySelector('.doctors-table-cell--full-name').textContent = data.doctor.full_name;
+                        const firstNameCell = row.querySelector('.doctors-table-cell--first-name');
+                        const lastNameCell = row.querySelector('.doctors-table-cell--last-name');
+                        if (firstNameCell) firstNameCell.textContent = data.doctor.first_name;
+                        if (lastNameCell) lastNameCell.textContent = data.doctor.last_name;
                     }
                     closeEditModal();
                 } else {
@@ -288,5 +290,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Utility Functions
+function showMessage(message, type) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.textContent = message;
+    messageDiv.className = `message ${type}`;
+    messageDiv.style.display = 'block';
+    
+    // Add show class for animation
+    setTimeout(() => {
+        messageDiv.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 300);
+    }, 5000);
+}
 </script>
 {% endblock %}

@@ -7,6 +7,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from .models import Appointment, AccessEvent
 from django.utils import timezone
+from django.db import models
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,21 @@ def qr_verify(request):
         # Find active appointment
         now = timezone.now()
         try:
-            appointment = Appointment.objects.get(
+            # First try to find appointment with valid time range
+            appointment = Appointment.objects.filter(
                 card_no=card_no,
-                status='active',
-                valid_from__lte=now,
-                valid_to__gte=now
-            )
+                status='active'
+            ).filter(
+                models.Q(valid_from__isnull=True) | models.Q(valid_from__lte=now),
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=now)
+            ).first()
+            
+            if not appointment:
+                # If no appointment found with time range, try without time constraints
+                appointment = Appointment.objects.get(
+                    card_no=card_no,
+                    status='active'
+                )
             
             # Create access event
             AccessEvent.objects.create(

@@ -838,9 +838,11 @@ def update_appointment(request, appointment_id):
             
             # Update other fields
             if data.get('appointment_date'):
-                appointment.appointment_date = data.get('appointment_date')
+                from datetime import datetime
+                appointment.appointment_date = datetime.strptime(data.get('appointment_date'), '%Y-%m-%d').date()
             if data.get('appointment_time'):
-                appointment.appointment_time = data.get('appointment_time')
+                from datetime import datetime
+                appointment.appointment_time = datetime.strptime(data.get('appointment_time'), '%H:%M').time()
             if data.get('status'):
                 appointment.status = data.get('status')
 

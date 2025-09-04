@@ -181,8 +181,12 @@ function submitEditPatient(event) {
 function updatePatientRow(patientId, patientData) {
     const row = document.querySelector(`tr[data-patient-id="${patientId}"]`);
     if (row) {
-        row.querySelector('.patients-table-cell--name').textContent = patientData.full_name;
-        row.querySelector('.patients-table-cell--phone').textContent = patientData.phone || '—';
+        const nameCell = row.querySelector('.patients-table-cell--name');
+        const phoneCell = row.querySelector('.patients-table-cell--phone');
+        if (nameCell) nameCell.textContent = patientData.full_name;
+        if (phoneCell) phoneCell.textContent = patientData.phone || '—';
+    } else {
+        console.error('Patient row not found for ID:', patientId);
     }
 }
 
@@ -246,8 +250,16 @@ function showMessage(message, type) {
     messageDiv.className = `message ${type}`;
     messageDiv.style.display = 'block';
     
+    // Add show class for animation
     setTimeout(() => {
-        messageDiv.style.display = 'none';
+        messageDiv.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+        setTimeout(() => {
+            messageDiv.style.display = 'none';
+        }, 300);
     }, 5000);
 }
 
