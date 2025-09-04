@@ -241,8 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const formData = new FormData(this);
             const data = {
-                first_name: formData.get('first_name'),
-                last_name: formData.get('last_name')
+                full_name: `${formData.get('first_name')} ${formData.get('last_name')}`.trim()
             };
             
             fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace('0', currentDoctorId), {

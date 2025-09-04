@@ -108,16 +108,6 @@
                     <option value="">— select doctor —</option>
                 </select>
             </div>
-            <div class="appointments-modal-form-row">
-                <div class="appointments-modal-form-group">
-                    <label for="edit_appointment_date" class="appointments-modal-form-label">Date *</label>
-                    <input type="date" id="edit_appointment_date" name="appointment_date" class="appointments-modal-form-input" required>
-                </div>
-                <div class="appointments-modal-form-group">
-                    <label for="edit_appointment_time" class="appointments-modal-form-label">Time *</label>
-                    <input type="time" id="edit_appointment_time" name="appointment_time" class="appointments-modal-form-input" required>
-                </div>
-            </div>
             <div class="appointments-modal-form-group">
                 <label for="edit_status" class="appointments-modal-form-label">Status</label>
                 <select id="edit_status" name="status" class="appointments-modal-form-input">
@@ -237,31 +227,17 @@ function editAppointment(appointmentId) {
         doctorSelect.innerHTML = '<option value="">— select doctor —</option>';
     }
     
-    // Set date and time
-    const dateEl = row.querySelector('.appointments-date');
-    const timeEl = row.querySelector('.appointments-time');
-    
-    if (dateEl && timeEl) {
-        const dateText = dateEl.textContent;
-        const timeText = timeEl.textContent;
-        
-        // Convert date from d/m/Y to Y-m-d
-        const dateParts = dateText.split('/');
-        const formattedDate = `${dateParts[2]}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
-        
-        document.getElementById('edit_appointment_date').value = formattedDate;
-        document.getElementById('edit_appointment_time').value = timeText;
-    } else {
-        console.error('Date or time element not found');
-        showMessage('Date or time element not found', 'error');
-        return;
-    }
-    
     // Set status
     const statusBadge = row.querySelector('.status-badge');
     if (statusBadge) {
-        const status = statusBadge.textContent.toLowerCase().replace(' ', '_');
-        document.getElementById('edit_status').value = status;
+        const statusText = statusBadge.textContent.toLowerCase();
+        const statusSelect = document.getElementById('edit_status');
+        for (let option of statusSelect.options) {
+            if (option.textContent.toLowerCase() === statusText) {
+                option.selected = true;
+                break;
+            }
+        }
     }
     
     

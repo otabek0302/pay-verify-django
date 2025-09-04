@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Live preview for edit modal doctor selection
+    // Live preview for edit modal doctor selection (if edit modal exists)
     const editDoctorCheckboxes = document.querySelectorAll('.edit-doctor-checkbox');
     if (editDoctorCheckboxes.length > 0) {
         editDoctorCheckboxes.forEach(checkbox => {
@@ -292,14 +292,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedCheckboxes = document.querySelectorAll('.edit-doctor-checkbox:checked');
         const previewElement = document.getElementById('editSelectedDoctorsPreview');
         
-        if (selectedCheckboxes.length > 0) {
+        if (previewElement && selectedCheckboxes.length > 0) {
             const previewHTML = Array.from(selectedCheckboxes).map(checkbox => {
-                const label = checkbox.closest('.doctor-checkbox-item').querySelector('.checkbox-label').textContent;
-                return `<span class="selected-doctor-tag">${label}</span>`;
-            }).join('');
+                const labelElement = checkbox.closest('.doctor-checkbox-item')?.querySelector('.checkbox-label');
+                if (labelElement) {
+                    return `<span class="selected-doctor-tag">${labelElement.textContent}</span>`;
+                }
+                return '';
+            }).filter(html => html).join('');
             previewElement.innerHTML = `<strong>Selected Doctors:</strong> ${previewHTML}`;
             previewElement.style.display = 'block';
-        } else {
+        } else if (previewElement) {
             previewElement.style.display = 'none';
         }
     }

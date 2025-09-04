@@ -888,16 +888,8 @@ def delete_appointment(request, appointment_id):
             # 2. Get appointment details for logging
             appointment_info = f"{appointment.patient.full_name} - {appointment.procedure.title}"
             
-            # 3. Use raw SQL to delete appointment (bypass foreign key constraints)
-            with connection.cursor() as cursor:
-                # Temporarily disable foreign key constraints
-                cursor.execute("PRAGMA foreign_keys=OFF")
-                try:
-                    # Delete the appointment
-                    cursor.execute("DELETE FROM medical_access_appointment WHERE id = %s", [appointment_id])
-                finally:
-                    # Re-enable foreign key constraints
-                    cursor.execute("PRAGMA foreign_keys=ON")
+            # 3. Delete the appointment (cascade will handle related records)
+            appointment.delete()
             
             return JsonResponse({
                 'success': True, 
