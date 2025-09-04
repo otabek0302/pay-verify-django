@@ -29,7 +29,7 @@ def qr_verify(request):
         logger.info(f"[QR VERIFY] Request data: {data}")
         
         # Extract card number from request
-        card_no = data.get('cardNo') or data.get('card_no') or data.get('card')
+        card_no = data.get('cardNo') or data.get('card_no') or data.get('card') or data.get('code')
         
         logger.info(f"[QR VERIFY] Extracted card_no: {card_no}")
         logger.info(f"[QR VERIFY] Available keys in data: {list(data.keys())}")
