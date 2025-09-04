@@ -39,6 +39,18 @@
                     <label>Status:</label>
                     <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
                 </div>
+                {% if appointment.valid_from %}
+                <div class="info-item">
+                    <label>Valid From:</label>
+                    <span>{{ appointment.valid_from|date:"F d, Y g:i A" }}</span>
+                </div>
+                {% endif %}
+                {% if appointment.valid_to %}
+                <div class="info-item">
+                    <label>Valid Until:</label>
+                    <span>{{ appointment.valid_to|date:"F d, Y g:i A" }}</span>
+                </div>
+                {% endif %}
             </div>
             
         </div>

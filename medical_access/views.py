@@ -584,6 +584,10 @@ def get_procedure_doctors(request, procedure_id):
         procedure = get_object_or_404(Procedure, id=procedure_id)
         doctors = procedure.doctors.all()
         
+        # If no doctors are assigned to this procedure, return all doctors
+        if not doctors.exists():
+            doctors = Doctor.objects.all()
+        
         return JsonResponse({
             'success': True,
             'doctors': [
