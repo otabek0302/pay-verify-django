@@ -96,8 +96,12 @@
             {% csrf_token %}
             <input type="hidden" id="edit_doctor_id" name="doctor_id">
             <div class="doctors-modal-form-group">
-                <label for="edit_doctor_full_name" class="doctors-modal-form-label">Full Name</label>
-                <input type="text" id="edit_doctor_full_name" name="full_name" class="doctors-modal-form-input" required>
+                <label for="edit_doctor_first_name" class="doctors-modal-form-label">First Name</label>
+                <input type="text" id="edit_doctor_first_name" name="first_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="edit_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
+                <input type="text" id="edit_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
             </div>
             <div class="doctors-modal-form-actions">
                 <button type="submit" class="doctors-btn doctors-btn--primary">Update</button>
@@ -140,7 +144,8 @@ function editDoctor(doctorId, firstName, lastName) {
     
     // Populate the edit form
     document.getElementById('edit_doctor_id').value = doctorId;
-    document.getElementById('edit_doctor_full_name').value = `${firstName} ${lastName}`.trim();
+    document.getElementById('edit_doctor_first_name').value = firstName;
+    document.getElementById('edit_doctor_last_name').value = lastName;
     
     // Show the modal
     document.getElementById('editDoctorModal').style.display = 'block';
@@ -236,7 +241,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const formData = new FormData(this);
             const data = {
-                full_name: formData.get('full_name').trim()
+                first_name: formData.get('first_name').trim(),
+                last_name: formData.get('last_name').trim()
             };
             
             fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace('0', currentDoctorId), {

@@ -344,6 +344,12 @@ def update_doctor(request, doctor_id):
             name_parts = data['full_name'].split()
             doctor.first_name = name_parts[0] if name_parts else ''
             doctor.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        elif data.get('first_name') or data.get('last_name'):
+            # Handle separate first_name and last_name fields
+            if data.get('first_name'):
+                doctor.first_name = data.get('first_name').strip()
+            if data.get('last_name'):
+                doctor.last_name = data.get('last_name').strip()
         
         doctor.save()
         
