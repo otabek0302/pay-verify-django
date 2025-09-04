@@ -40,7 +40,7 @@ function getToastIcon(type) {
 
 function closeToast(button) {
     const toast = button.closest('.toast');
-    toast.classList.remove('show');
+    toast.classList.add('closing');
     setTimeout(() => {
         if (toast.parentNode) {
             toast.parentNode.removeChild(toast);
