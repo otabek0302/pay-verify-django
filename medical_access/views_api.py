@@ -111,7 +111,6 @@ def qr_verify(request):
                 'employeeNo': f"APT{appointment.id}"
             })
             
-            
     except Exception as e:
         logger.error(f"[QR VERIFY] Error: {e}")
         return JsonResponse({
