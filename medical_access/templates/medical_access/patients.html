@@ -114,12 +114,15 @@ let currentPatientId = null;
 
 // Edit Patient Functions
 function editPatient(patientId) {
+    console.log('editPatient called with ID:', patientId);
     currentPatientId = patientId;
+    console.log('currentPatientId set to:', currentPatientId);
     
     // Fetch patient data from server
     fetch(`{% url "medical_access:get_patient" 0 %}`.replace('0', patientId))
         .then(response => response.json())
         .then(data => {
+            console.log('Patient data loaded, currentPatientId:', currentPatientId);
             if (data.success) {
                 const patient = data.patient;
                 
@@ -149,6 +152,8 @@ function closeEditPatientModal() {
 function submitEditPatient(event) {
     event.preventDefault();
     
+    console.log('submitEditPatient called, currentPatientId:', currentPatientId);
+    
     if (!currentPatientId) {
         showMessage('No patient selected for editing', 'error');
         return;
@@ -165,6 +170,7 @@ function submitEditPatient(event) {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('Update response received, currentPatientId:', currentPatientId);
         if (data.success) {
             showMessage(data.message, 'success');
             // Update the table row BEFORE closing modal
