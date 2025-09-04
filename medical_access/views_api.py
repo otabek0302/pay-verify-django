@@ -76,6 +76,14 @@ def qr_verify(request):
                         'cardNo': card_no,
                         'employeeNo': f"APT{appointment.id}"
                     })
+                else:
+                    # No appointment found at all
+                    logger.warning(f"[QR VERIFY] ❌ No valid appointment found for card {card_no}")
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'Access denied - invalid or expired pass',
+                        'cardNo': card_no
+                    }, status=403)
             
             # Only update status if appointment is active
             if appointment.status == 'active':
@@ -103,14 +111,6 @@ def qr_verify(request):
                 'employeeNo': f"APT{appointment.id}"
             })
             
-        except Appointment.DoesNotExist:
-            logger.warning(f"[QR VERIFY] ❌ No valid appointment found for card {card_no}")
-            
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Access denied - invalid or expired pass',
-                'cardNo': card_no
-            }, status=403)
             
     except Exception as e:
         logger.error(f"[QR VERIFY] Error: {e}")
