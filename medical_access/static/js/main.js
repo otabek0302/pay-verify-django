@@ -48,38 +48,10 @@ function closeToast(button) {
     }, 300);
 }
 
-// Enhanced message system with animations
+// Enhanced message system with animations - ALWAYS use toast
 function showMessage(message, type = 'info', duration = 5000) {
-    // Try toast first, fallback to legacy message
-    if (document.querySelector('.toast-container') || type !== 'info') {
-        showToast(message, type, duration);
-        return;
-    }
-    
-    const messageEl = document.createElement('div');
-    messageEl.className = `message ${type}`;
-    messageEl.textContent = message;
-    
-    // Remove existing messages
-    const existingMessages = document.querySelectorAll('.message');
-    existingMessages.forEach(msg => msg.remove());
-    
-    document.body.appendChild(messageEl);
-    
-    // Trigger animation
-    setTimeout(() => messageEl.classList.add('show'), 100);
-    
-    // Auto remove
-    setTimeout(() => {
-        if (messageEl.parentNode) {
-            messageEl.classList.remove('show');
-            setTimeout(() => {
-                if (messageEl.parentNode) {
-                    messageEl.parentNode.removeChild(messageEl);
-                }
-            }, 300);
-        }
-    }, duration);
+    // Always use the new toast system
+    showToast(message, type, duration);
 }
 
 function validateForm(form) {
