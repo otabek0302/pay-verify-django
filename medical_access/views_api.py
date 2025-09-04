@@ -31,6 +31,9 @@ def qr_verify(request):
         # Extract card number from request
         card_no = data.get('cardNo') or data.get('card_no') or data.get('card')
         
+        logger.info(f"[QR VERIFY] Extracted card_no: {card_no}")
+        logger.info(f"[QR VERIFY] Available keys in data: {list(data.keys())}")
+        
         if not card_no:
             logger.warning("[QR VERIFY] No card number provided")
             return JsonResponse({
@@ -57,6 +60,11 @@ def qr_verify(request):
                     status='active'
                 )
             
+            # Update appointment status to 'used' when QR is scanned
+            appointment.status = 'used'
+            appointment.used_at = now
+            appointment.save()
+            
             # Create access event
             AccessEvent.objects.create(
                 appointment=appointment,
@@ -66,7 +74,7 @@ def qr_verify(request):
                 card_no=card_no
             )
             
-            logger.info(f"[QR VERIFY] ✅ Access granted for card {card_no}")
+            logger.info(f"[QR VERIFY] ✅ Access granted for card {card_no}, appointment {appointment.id} marked as used")
             
             return JsonResponse({
                 'status': 'success',
