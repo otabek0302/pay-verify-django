@@ -68,7 +68,7 @@
                     <td class="doctors-table-cell">{{ doctor.created_at|date:"d/m/Y H:i" }}</td>
                     <td class="doctors-table-cell">
                         {% if user.role == 'admin' %}
-                        <button class="doctors-action-btn doctors-action-btn--edit" onclick="editDoctor({{ doctor.id }}, '{{ doctor.first_name|escapejs }}', '{{ doctor.last_name|escapejs }}')">Edit</button>
+                        <button class="doctors-action-btn doctors-action-btn--edit" onclick="editDoctorFromRow(this)">Edit</button>
                         <button class="doctors-action-btn doctors-action-btn--delete" onclick="deleteDoctor({{ doctor.id }}, '{{ doctor.full_name|escapejs }}')">Delete</button>
                         {% else %}
                         <span class="doctors-no-actions">No actions available</span>
@@ -149,6 +149,21 @@ function editDoctor(doctorId, firstName, lastName) {
     
     // Show the modal
     document.getElementById('editDoctorModal').style.display = 'block';
+}
+
+function editDoctorFromRow(button) {
+    // Get the table row containing the button
+    const row = button.closest('tr');
+    
+    // Get the doctor ID from the data attribute
+    const doctorId = row.getAttribute('data-doctor-id');
+    
+    // Get the current first name and last name from the table cells
+    const firstName = row.cells[1].textContent.trim();
+    const lastName = row.cells[2].textContent.trim();
+    
+    // Call the existing editDoctor function with current data
+    editDoctor(doctorId, firstName, lastName);
 }
 
 function closeEditModal() {
