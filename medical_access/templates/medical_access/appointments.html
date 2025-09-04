@@ -410,6 +410,14 @@ function showMessage(message, type) {
     }, 5000);
 }
 
+// Add event listener for edit form
+document.addEventListener('DOMContentLoaded', function() {
+    const editForm = document.getElementById('editAppointmentForm');
+    if (editForm) {
+        editForm.addEventListener('submit', submitEditAppointment);
+    }
+});
+
 // Close modals when clicking outside
 window.onclick = function(event) {
     if (event.target.classList.contains('appointments-modal')) {

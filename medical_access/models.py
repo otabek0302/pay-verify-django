@@ -77,7 +77,7 @@ class Door(models.Model):
 class Procedure(models.Model):
     title = models.CharField(max_length=160)
     price = models.DecimalField(
-        max_digits=10, 
+        max_digits=15, 
         decimal_places=2,
         validators=[MinValueValidator(0.01, 'Price must be greater than 0')]
     )
