@@ -876,7 +876,7 @@ def update_appointment(request, appointment_id):
 
 @login_required
 def delete_appointment(request, appointment_id):
-    """Delete an appointment"""
+    """Delete an appointment and all related data"""
     if request.user.role != User.Role.ADMIN:
         return JsonResponse({'success': False, 'message': 'Admin access required'}, status=403)
     
@@ -884,23 +884,33 @@ def delete_appointment(request, appointment_id):
         try:
             appointment = get_object_or_404(Appointment, id=appointment_id)
             
+            # Get appointment details for logging before deletion
+            appointment_info = f"{appointment.patient.full_name} - {appointment.procedure.title}"
+            patient = appointment.patient
+            
             # Handle all related data before deleting appointment
             from medical_access.models import AccessEvent
-            from django.db import connection
             
             # 1. Set appointment to null in AccessEvent records (preserve audit data)
             AccessEvent.objects.filter(appointment=appointment).update(appointment=None)
             
-            # 2. Get appointment details for logging
-            appointment_info = f"{appointment.patient.full_name} - {appointment.procedure.title}"
-            
-            # 3. Delete the appointment (cascade will handle related records)
+            # 2. Delete the appointment (this will also delete QR code data as it's part of the appointment)
             appointment.delete()
             
-            return JsonResponse({
-                'success': True, 
-                'message': f'Appointment "{appointment_info}" deleted successfully'
-            })
+            # 3. Check if patient has any other appointments, if not, delete the patient
+            remaining_appointments = Appointment.objects.filter(patient=patient).count()
+            if remaining_appointments == 0:
+                patient.delete()
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Appointment "{appointment_info}" and patient deleted successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Appointment "{appointment_info}" deleted successfully (patient has other appointments)'
+                })
+                
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)}, status=400)
     
