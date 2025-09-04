@@ -232,12 +232,17 @@ function editAppointment(appointmentId) {
     if (statusBadge) {
         const statusText = statusBadge.textContent.toLowerCase();
         const statusSelect = document.getElementById('edit_status');
-        for (let option of statusSelect.options) {
-            if (option.textContent.toLowerCase() === statusText) {
-                option.selected = true;
-                break;
-            }
-        }
+        
+        // Map display text to status values
+        const statusMap = {
+            'active': 'active',
+            'used': 'used', 
+            'expired': 'expired',
+            'revoked': 'revoked'
+        };
+        
+        const statusValue = statusMap[statusText] || statusText;
+        statusSelect.value = statusValue;
     }
     
     
