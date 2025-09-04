@@ -1,0 +1,421 @@
+{% extends 'medical_access/base.html' %}
+
+{% block title %}Patient Registration - PayVerify{% endblock %}
+
+{% block content %}
+<div class="patient-registration-page">
+    <!-- New Receipt Form Section -->
+    <div class="patient-registration-form-section">
+        <div class="patient-registration-form-header">
+            <h2 class="patient-registration-form-title">New Receipt</h2>
+        </div>
+        <form id="newReceiptForm" class="patient-registration-form">
+            {% csrf_token %}
+            <div class="patient-registration-form-row">
+                <div class="patient-registration-form-group">
+                    <label for="first_name" class="patient-registration-form-label">Patient's First Name</label>
+                    <input type="text" id="first_name" name="first_name" value="Ivan" class="patient-registration-form-input" required>
+                </div>
+                
+                <div class="patient-registration-form-group">
+                    <label for="last_name" class="patient-registration-form-label">Patient's Last Name</label>
+                    <input type="text" id="last_name" name="last_name" value="Ivanov" class="patient-registration-form-input" required>
+                </div>
+            </div>
+            
+            <div class="patient-registration-form-group">
+                <label for="phone" class="patient-registration-form-label">Phone (Optional)</label>
+                <input type="tel" id="phone" name="phone" placeholder="+998 ..." class="patient-registration-form-input">
+            </div>
+            
+            <div class="patient-registration-form-group">
+                <label for="procedure" class="patient-registration-form-label">Procedure</label>
+                <select id="procedure" name="procedure_id" class="patient-registration-form-select" required>
+                    <option value="">— Select Procedure —</option>
+                    {% for procedure in procedures %}
+                    <option value="{{ procedure.id }}" data-price="{{ procedure.price }}">{{ procedure.title }}</option>
+                    {% endfor %}
+                </select>
+                <div class="patient-registration-procedure-buttons">
+                    {% for procedure in procedures %}
+                    <button type="button" class="patient-registration-procedure-btn" onclick="selectProcedure({{ procedure.id }})">{{ procedure.title }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="patient-registration-form-group">
+                <label for="doctor" class="patient-registration-form-label">Doctor (Optional)</label>
+                <select id="doctor" name="doctor_id" class="patient-registration-form-select" disabled>
+                    <option value="">— Not Selected —</option>
+                </select>
+                <small id="doctor-help" class="patient-registration-form-hint">Select a procedure first to see available doctors</small>
+            </div>
+            
+            <div class="patient-registration-form-group">
+                <label for="amount" class="patient-registration-form-label">Amount (sum)</label>
+                <input type="number" id="amount" name="amount" value="0" step="0.01" class="patient-registration-form-input" required>
+                <small class="patient-registration-form-hint">It will be substituted from the procedure, but it can be adjusted.</small>
+            </div>
+            
+
+            
+            <div class="patient-registration-form-actions">
+                <button type="submit" class="patient-registration-btn patient-registration-btn--primary">Create Receipt</button>
+                <button type="button" class="patient-registration-btn patient-registration-btn--secondary" onclick="createAndOpen()">Create and Open</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Latest Receipts Section -->
+    <div class="patient-registration-receipts-section">
+        <div class="patient-registration-receipts-header">
+            <h3 class="patient-registration-receipts-title">Latest Receipts</h3>
+        </div>
+        
+        <!-- Filters and Search Controls -->
+        <div class="patient-registration-controls-row">
+            <button class="patient-registration-filter-btn patient-registration-filter-btn--active" data-filter="all">All</button>
+            <button class="patient-registration-filter-btn" data-filter="paid">Paid</button>
+            <button class="patient-registration-filter-btn" data-filter="entered">Entered</button>
+            <button class="patient-registration-filter-btn" data-filter="exited">Came out</button>
+            
+            <input type="date" id="searchDate" name="searchDate" class="patient-registration-search-input">
+            <input type="text" id="searchQuery" name="searchQuery" placeholder="Search by name/phone" class="patient-registration-search-input">
+            <button type="button" class="patient-registration-btn patient-registration-btn--search" onclick="searchReceipts()">Search</button>
+            <button type="button" class="patient-registration-btn patient-registration-btn--export" onclick="exportCSV()">CSV Export</button>
+        </div>
+        
+        <!-- Receipts Table -->
+        <div class="patient-registration-receipts-table">
+            <table class="patient-registration-table">
+                <thead class="patient-registration-table-head">
+                    <tr class="patient-registration-table-row">
+                        <th class="patient-registration-table-header">ID</th>
+                        <th class="patient-registration-table-header">Patient</th>
+                        <th class="patient-registration-table-header">Procedure</th>
+                        <th class="patient-registration-table-header">Doctor</th>
+                        <th class="patient-registration-table-header">Sum</th>
+                        <th class="patient-registration-table-header">Status</th>
+                        <th class="patient-registration-table-header">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="patient-registration-table-body">
+                    {% for appointment in latest_appointments %}
+                    <tr class="patient-registration-table-row">
+                        <td class="patient-registration-table-cell">{{ appointment.id }}</td>
+                        <td class="patient-registration-table-cell">
+                            <span class="patient-registration-patient-name">{{ appointment.patient.full_name }}</span>
+                            {% if appointment.patient.phone %}
+                            <span class="patient-registration-patient-phone">{{ appointment.patient.phone }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="patient-registration-table-cell">{{ appointment.procedure.title }}</td>
+                        <td class="patient-registration-table-cell">
+                            {% if appointment.doctor %}
+                                {{ appointment.doctor.full_name }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="patient-registration-table-cell">
+                            <span class="patient-registration-amount">{{ appointment.procedure.price }} sum</span>
+                        </td>
+                        <td class="patient-registration-table-cell">
+                            {% if appointment.paid %}
+                                <span class="status-badge status-badge--paid">Paid</span>
+                            {% else %}
+                                <span class="status-badge status-badge--pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td class="patient-registration-table-cell">
+                            <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
+                               class="patient-registration-action-btn patient-registration-action-btn--open" target="_blank">Open</a>
+                            {% if appointment.paid %}
+                            <a href="{% url 'medical_access:generate_receipt' appointment.id %}" 
+                               class="patient-registration-action-btn patient-registration-action-btn--print" target="_blank">Print</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="patient-registration-table-row">
+                        <td colspan="7" class="patient-registration-table-cell patient-registration-table-cell--empty">
+                            No appointments found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="message" class="message" style="display: none;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Select procedure and update amount
+function selectProcedure(procedureId) {
+    const select = document.getElementById('procedure');
+    const amountInput = document.getElementById('amount');
+    
+    select.value = procedureId;
+    const option = select.options[select.selectedIndex];
+    const price = option.dataset.price;
+    
+    if (price) {
+        amountInput.value = price;
+        amountInput.disabled = true;
+    } else {
+        amountInput.disabled = false;
+    }
+    
+    // Trigger change event
+    select.dispatchEvent(new Event('change'));
+}
+
+// Update amount when procedure changes
+document.getElementById('procedure').addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    const amountInput = document.getElementById('amount');
+    const doctorSelect = document.getElementById('doctor');
+    const doctorHelp = document.getElementById('doctor-help');
+    
+    // Update amount and disable/enable input
+    if (option.dataset.price) {
+        amountInput.value = option.dataset.price;
+        amountInput.disabled = true;
+    } else {
+        amountInput.disabled = false;
+    }
+    
+    // Update doctor selection
+    if (option.value) {
+        loadDoctorsForProcedure(option.value);
+        doctorHelp.textContent = 'Loading doctors...';
+    } else {
+        // Clear doctor selection when no procedure is selected
+        doctorSelect.innerHTML = '<option value="">— not selected —</option>';
+        doctorHelp.textContent = 'Select a procedure first to see available doctors';
+    }
+});
+
+// Function to load doctors for a specific procedure
+function loadDoctorsForProcedure(procedureId) {
+    const doctorSelect = document.getElementById('doctor');
+    const doctorHelp = document.getElementById('doctor-help');
+    
+    // Show loading state
+    doctorHelp.textContent = 'Loading doctors...';
+    doctorHelp.className = 'form-hint loading';
+    
+    fetch(`/medical_access/procedures/${procedureId}/doctors/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.doctors.length > 0) {
+                // Populate doctor dropdown
+                doctorSelect.innerHTML = '<option value="">— not selected —</option>';
+                data.doctors.forEach(doctor => {
+                    const option = document.createElement('option');
+                    option.value = doctor.id;
+                    option.textContent = doctor.full_name;
+                    doctorSelect.appendChild(option);
+                });
+                
+                // Show success message
+                doctorHelp.textContent = `${data.doctors.length} doctor(s) available for this procedure`;
+                doctorHelp.className = 'form-hint success';
+                
+                // Enable doctor selection
+                doctorSelect.disabled = false;
+            } else {
+                // No doctors assigned to this procedure
+                doctorSelect.innerHTML = '<option value="">— no doctors assigned —</option>';
+                doctorHelp.textContent = 'No doctors are currently assigned to this procedure';
+                doctorHelp.className = 'form-hint warning';
+                
+                // Disable doctor selection
+                doctorSelect.disabled = true;
+            }
+        })
+        .catch(error => {
+            // Show error state
+            doctorSelect.innerHTML = '<option value="">— error loading doctors —</option>';
+            doctorHelp.textContent = 'Error loading doctors. Please try again.';
+            doctorHelp.className = 'form-hint error';
+            
+            // Disable doctor selection
+            doctorSelect.disabled = true;
+            console.error('Error loading doctors:', error);
+        });
+}
+
+// Form submission
+document.getElementById('newReceiptForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        phone: formData.get('phone'),
+        procedure_id: formData.get('procedure_id'),
+        doctor_id: formData.get('doctor_id') || null,
+        amount: formData.get('amount')
+    };
+    
+    fetch('{% url "medical_access:create_appointment" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            // Reload page to show new appointment
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showMessage(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error creating appointment', 'error');
+    });
+});
+
+// Create and open receipt
+function createAndOpen() {
+    // Submit form and then open the created receipt
+    document.getElementById('newReceiptForm').dispatchEvent(new Event('submit'));
+}
+
+// Open receipt
+function openReceipt(appointmentId) {
+    window.open(`{% url 'medical_access:appointment_detail' 0 %}`.replace('0', appointmentId), '_blank');
+}
+
+// Filter receipts functionality
+document.querySelectorAll('.receipt-filter-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        // Remove active class from all buttons
+        document.querySelectorAll('.receipt-filter-btn').forEach(btn => btn.classList.remove('active'));
+        // Add active class to clicked button
+        this.classList.add('active');
+        
+        const filter = this.dataset.filter;
+        filterReceipts(filter);
+    });
+});
+
+function filterReceipts(filter) {
+    const rows = document.querySelectorAll('.receipts-table tbody tr');
+    
+    rows.forEach(row => {
+        if (filter === 'all') {
+            row.style.display = '';
+        } else if (filter === 'paid') {
+            const statusCell = row.querySelector('td:nth-child(6)');
+            const isPaid = statusCell.textContent.includes('PAID');
+            row.style.display = isPaid ? '' : 'none';
+        } else if (filter === 'entered') {
+            // This would need backend logic to determine if patient entered
+            // For now, show all rows
+            row.style.display = '';
+        } else if (filter === 'exited') {
+            // This would need backend logic to determine if patient exited
+            // For now, show all rows
+            row.style.display = '';
+        }
+    });
+}
+
+// Enhanced search functionality
+function searchReceipts() {
+    const date = document.getElementById('searchDate').value;
+    const query = document.getElementById('searchQuery').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('.receipts-table tbody tr');
+    
+    rows.forEach(row => {
+        const patientName = row.querySelector('.patient-name')?.textContent.toLowerCase() || '';
+        const patientPhone = row.querySelector('.patient-phone')?.textContent.toLowerCase() || '';
+        const procedureName = row.querySelector('.procedure-name')?.textContent.toLowerCase() || '';
+        const doctorName = row.querySelector('.doctor-name')?.textContent.toLowerCase() || '';
+        
+        const matchesSearch = !query || 
+            patientName.includes(query) || 
+            patientPhone.includes(query) || 
+            procedureName.includes(query) || 
+            doctorName.includes(query);
+        
+        // Date filtering would need backend implementation
+        // For now, just show/hide based on search query
+        row.style.display = matchesSearch ? '' : 'none';
+    });
+    
+    // Show success message
+    if (query) {
+        showMessage(`Search results for: "${query}"`, 'success');
+    }
+}
+
+// Enhanced CSV export
+function exportCSV() {
+    const table = document.querySelector('.receipts-table table');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    
+    let csv = [];
+    
+    // Add headers
+    const headers = Array.from(rows[0].querySelectorAll('th')).map(th => th.textContent);
+    csv.push(headers.join(','));
+    
+    // Add data rows
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const cells = Array.from(row.querySelectorAll('td'));
+        const rowData = cells.map(cell => {
+            // Clean up the cell content (remove HTML, get just text)
+            let text = cell.textContent.trim();
+            // Escape commas and quotes for CSV
+            if (text.includes(',') || text.includes('"')) {
+                text = `"${text.replace(/"/g, '""')}"`;
+            }
+            return text;
+        });
+        csv.push(rowData.join(','));
+    }
+    
+    // Create and download CSV file
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `receipts_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showMessage('CSV file downloaded successfully!', 'success');
+}
+
+// Hotkeys
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'F9') {
+        e.preventDefault();
+        document.getElementById('newReceiptForm').dispatchEvent(new Event('submit'));
+    }
+    
+    if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        createAndOpen();
+    }
+});
+</script>
+{% endblock %}

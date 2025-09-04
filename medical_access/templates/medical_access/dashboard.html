@@ -1,0 +1,87 @@
+{% extends 'medical_access/base.html' %} 
+{% block title %}Dashboard - PayVerify{% endblock %} 
+{% block content %}
+<div class="dashboard-content">
+    <!-- Statistics Cards Section -->
+    <div class="dashboard-stats-grid">
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Revenue (Today)</div>
+            <div class="dashboard-stat-card-value">{{ statistics.today_revenue }} sum</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Receipts (Today)</div>
+            <div class="dashboard-stat-card-value">{{ statistics.today_receipts }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Scans 24h – Allow/Deny</div>
+            <div class="dashboard-stat-card-value">{{ statistics.scans_24h_allow }}/{{ statistics.scans_24h_deny }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Active Posts (5 min)</div>
+            <div class="dashboard-stat-card-value">{{ statistics.active_posts }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Active Doctors</div>
+            <div class="dashboard-stat-card-value">{{ statistics.active_doctors }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Active Procedures</div>
+            <div class="dashboard-stat-card-value">{{ statistics.active_procedures }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Total Patients</div>
+            <div class="dashboard-stat-card-value">{{ statistics.total_patients }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Locations</div>
+            <div class="dashboard-stat-card-value">{{ statistics.total_locations }}</div>
+        </div>
+    </div>
+
+    <!-- Recent Appointments Section -->
+    <div class="dashboard-appointments">
+        <div class="appointments-header">
+            <h3 class="appointments-card-title">Recent Appointments</h3>
+            <a href="{% url 'medical_access:appointments' %}" class="appointments-card-link">View All</a>
+        </div>
+        <div class="appointments-body">
+            <table class="appointments-table">
+                <thead class="table-head">
+                    <tr class="table-row">
+                        <th class="table-header">Appointment ID</th>
+                        <th class="table-header">Date</th>
+                        <th class="table-header">Patient</th>
+                        <th class="table-header">Doctor</th>
+                        <th class="table-header">Status</th>
+                        <th class="table-header">Action</th>
+                    </tr>
+                </thead>
+                            <tbody class="table-body">
+                {% for appointment in latest_appointments %}
+                <tr class="table-row">
+                    <td class="table-cell">#APT{{ appointment.id|stringformat:"03d" }}</td>
+                    <td class="table-cell">{{ appointment.appointment_date|date:"M d, Y" }}</td>
+                    <td class="table-cell">{{ appointment.patient.full_name }}</td>
+                    <td class="table-cell">{{ appointment.doctor.full_name }}</td>
+                    <td class="table-cell">
+                        {% if appointment.paid %}
+                            <span class="status-badge status-badge--completed">Paid</span>
+                        {% else %}
+                            <span class="status-badge status-badge--pending">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td class="table-cell">
+                        <a href="{% url 'medical_access:appointments' %}" class="table-link">View Details</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="table-row">
+                    <td colspan="6" class="table-cell" style="text-align: center; color: var(--text-secondary); padding: 40px;">No appointments found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,292 @@
+{% extends 'medical_access/base.html' %}
+
+{% block title %}Doctors - PayVerify{% endblock %}
+
+{% block content %}
+<div class="doctors-page">
+    <div class="doctors-page-header">
+        <h1 class="doctors-page-title">Doctors</h1>
+        <div class="doctors-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="doctors-page-btn doctors-page-btn--secondary">Back to Dashboard</a>
+        </div>
+    </div>
+    
+    {% if user.role == 'admin' %}
+    <!-- Add Doctor Form - Only visible for admin users -->
+    <div class="doctors-form-section">
+        <div class="doctors-form-header">
+            <h2 class="doctors-form-title">Add New Doctor</h2>
+        </div>
+        <form id="addDoctorForm" class="doctors-form">
+            {% csrf_token %}
+            <div class="doctors-form-row">
+                <div class="doctors-form-group">
+                    <label for="doctor_first_name" class="doctors-form-label">First Name</label>
+                    <input type="text" id="doctor_first_name" name="first_name" placeholder="First name" class="doctors-form-input" required>
+                </div>
+                <div class="doctors-form-group">
+                    <label for="doctor_last_name" class="doctors-form-label">Last Name</label>
+                    <input type="text" id="doctor_last_name" name="last_name" placeholder="Last name" class="doctors-form-input" required>
+                </div>
+            </div>
+            <div class="doctors-form-actions">
+                <button type="submit" class="doctors-btn doctors-btn--primary">Save</button>
+                <button type="button" class="doctors-btn doctors-btn--secondary" onclick="clearDoctorForm()">Clear</button>
+            </div>
+        </form>
+
+    </div>
+    {% endif %}
+    
+    <div class="doctors-table-section">
+        <table class="doctors-table">
+            <thead class="doctors-table-head">
+                <tr class="doctors-table-row">
+                    <th class="doctors-table-header">ID</th>
+                    <th class="doctors-table-header">First Name</th>
+                    <th class="doctors-table-header">Last Name</th>
+                    <th class="doctors-table-header">Procedures</th>
+                    <th class="doctors-table-header">Created</th>
+                    <th class="doctors-table-header">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="doctors-table-body">
+                {% for doctor in doctors %}
+                <tr class="doctors-table-row" data-doctor-id="{{ doctor.id }}">
+                    <td class="doctors-table-cell">{{ doctor.id }}</td>
+                    <td class="doctors-table-cell doctors-table-cell--first-name">{{ doctor.first_name }}</td>
+                    <td class="doctors-table-cell doctors-table-cell--last-name">{{ doctor.last_name }}</td>
+                    <td class="doctors-table-cell doctors-table-cell--procedures">
+                        {% if doctor.procedures.exists %}
+                            {% for procedure in doctor.procedures.all %}
+                                <span class="doctors-procedure-badge">{{ procedure.title }}</span>{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            <span class="doctors-no-procedures">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="doctors-table-cell">{{ doctor.created_at|date:"d/m/Y H:i" }}</td>
+                    <td class="doctors-table-cell">
+                        {% if user.role == 'admin' %}
+                        <button class="doctors-action-btn doctors-action-btn--edit" onclick="editDoctor({{ doctor.id }}, '{{ doctor.first_name|escapejs }}', '{{ doctor.last_name|escapejs }}')">Edit</button>
+                        <button class="doctors-action-btn doctors-action-btn--delete" onclick="deleteDoctor({{ doctor.id }}, '{{ doctor.full_name|escapejs }}')">Delete</button>
+                        {% else %}
+                        <span class="doctors-no-actions">No actions available</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="doctors-table-row">
+                    <td colspan="6" class="doctors-table-cell doctors-table-cell--empty">No doctors found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Doctor Modal -->
+<div id="editDoctorModal" class="doctors-modal" style="display: none;">
+    <div class="doctors-modal-content">
+        <div class="doctors-modal-header">
+            <h3 class="doctors-modal-title">Edit Doctor</h3>
+            <span class="doctors-modal-close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <form id="editDoctorForm" class="doctors-modal-form">
+            {% csrf_token %}
+            <input type="hidden" id="edit_doctor_id" name="doctor_id">
+            <div class="doctors-modal-form-group">
+                <label for="edit_doctor_first_name" class="doctors-modal-form-label">First Name</label>
+                <input type="text" id="edit_doctor_first_name" name="first_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="edit_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
+                <input type="text" id="edit_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-actions">
+                <button type="submit" class="doctors-btn doctors-btn--primary">Update</button>
+                <button type="button" class="doctors-btn doctors-btn--secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteDoctorModal" class="doctors-modal" style="display: none;">
+    <div class="doctors-modal-content">
+        <div class="doctors-modal-header">
+            <h3 class="doctors-modal-title">Confirm Delete</h3>
+            <span class="doctors-modal-close" onclick="closeDeleteModal()">&times;</span>
+        </div>
+        <div class="doctors-modal-body">
+            <p>Are you sure you want to delete doctor: <strong id="deleteDoctorName"></strong>?</p>
+            <p class="doctors-modal-warning">This action cannot be undone!</p>
+        </div>
+        <div class="doctors-modal-footer">
+            <button class="doctors-btn doctors-btn--danger" onclick="confirmDeleteDoctor()">Delete</button>
+            <button class="doctors-btn doctors-btn--secondary" onclick="closeDeleteModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentDoctorId = null;
+
+function clearDoctorForm() {
+    document.getElementById('addDoctorForm').reset();
+}
+
+function editDoctor(doctorId, firstName, lastName) {
+    currentDoctorId = doctorId;
+    
+    // Populate the edit form
+    document.getElementById('edit_doctor_id').value = doctorId;
+    document.getElementById('edit_doctor_first_name').value = firstName;
+    document.getElementById('edit_doctor_last_name').value = lastName;
+    
+    // Show the modal
+    document.getElementById('editDoctorModal').style.display = 'block';
+}
+
+function closeEditModal() {
+    document.getElementById('editDoctorModal').style.display = 'none';
+    currentDoctorId = null;
+}
+
+function deleteDoctor(doctorId, fullName) {
+    currentDoctorId = doctorId;
+    document.getElementById('deleteDoctorName').textContent = fullName;
+    document.getElementById('deleteDoctorModal').style.display = 'block';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteDoctorModal').style.display = 'none';
+    currentDoctorId = null;
+}
+
+function confirmDeleteDoctor() {
+    if (currentDoctorId) {
+        fetch(`{% url 'medical_access:delete_doctor' 0 %}`.replace('0', currentDoctorId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                // Remove the row from the table
+                const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
+                if (row) row.remove();
+                closeDeleteModal();
+            } else {
+                showMessage(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error deleting doctor', 'error');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Add doctor form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const addDoctorForm = document.getElementById('addDoctorForm');
+    if (addDoctorForm) {
+        addDoctorForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                first_name: formData.get('first_name'),
+                last_name: formData.get('last_name')
+            };
+            
+            fetch('{% url "medical_access:create_doctor" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    clearDoctorForm();
+                    // Reload page to show new doctor
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error creating doctor', 'error');
+                console.error('Error:', error);
+            });
+        });
+    }
+    
+    // Edit doctor form submission
+    const editDoctorForm = document.getElementById('editDoctorForm');
+    if (editDoctorForm) {
+        editDoctorForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                first_name: formData.get('first_name'),
+                last_name: formData.get('last_name')
+            };
+            
+            fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace('0', currentDoctorId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Update the table row
+                    const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
+                    if (row) {
+                        row.querySelector('.doctors-table-cell--first-name').textContent = data.doctor.first_name;
+                        row.querySelector('.doctors-table-cell--last-name').textContent = data.doctor.last_name;
+                        row.querySelector('.doctors-table-cell--full-name').textContent = data.doctor.full_name;
+                    }
+                    closeEditModal();
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error updating doctor', 'error');
+                console.error('Error:', error);
+            });
+        });
+    }
+    
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+        const editModal = document.getElementById('editDoctorModal');
+        const deleteModal = document.getElementById('deleteDoctorModal');
+        
+        if (event.target === editModal) {
+            closeEditModal();
+        }
+        if (event.target === deleteModal) {
+            closeDeleteModal();
+        }
+    }
+});
+</script>
+{% endblock %}

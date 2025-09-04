@@ -1,0 +1,356 @@
+/* === Cash Register Page Styles === */
+.patient-registration-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Form Section */
+.patient-registration-form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.patient-registration-form-header {
+    padding: 16px 20px 0 20px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.patient-registration-form-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+}
+
+.patient-registration-form {
+    padding: 20px;
+}
+
+.patient-registration-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.patient-registration-form-group {
+    margin-bottom: 12px;
+}
+
+.patient-registration-form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.patient-registration-form-input,
+.patient-registration-form-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: var(--text-primary);
+    background-color: var(--surface);
+    transition: all 0.3s ease;
+}
+
+.patient-registration-form-input:focus,
+.patient-registration-form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
+}
+
+.patient-registration-form-input:disabled {
+    background-color: var(--background);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.patient-registration-form-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    display: block;
+}
+
+.patient-registration-procedure-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.patient-registration-procedure-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.patient-registration-procedure-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: rgba(0, 123, 255, 0.05);
+}
+
+
+
+.patient-registration-form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+
+.patient-registration-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.patient-registration-btn--primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.patient-registration-btn--primary:hover {
+    background: var(--primary-dark);
+}
+
+.patient-registration-btn--secondary {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.patient-registration-btn--secondary:hover {
+    background: #5a6268;
+}
+
+.patient-registration-btn--search {
+    background: var(--info-color);
+    color: white;
+}
+
+.patient-registration-btn--search:hover {
+    background: #138496;
+}
+
+.patient-registration-btn--export {
+    background: var(--success-color);
+    color: white;
+}
+
+.patient-registration-btn--export:hover {
+    background: #218838;
+}
+
+
+
+/* Receipts Section */
+.patient-registration-receipts-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.patient-registration-receipts-header {
+    padding: 24px 24px 0 24px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.patient-registration-receipts-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 24px 0;
+}
+
+.patient-registration-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-light);
+    flex-wrap: wrap;
+}
+
+.patient-registration-filter-btn {
+    min-width: 60px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.patient-registration-filter-btn:hover {
+    background: var(--background);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.patient-registration-filter-btn--active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.patient-registration-search-input {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-primary);
+    background-color: var(--surface);
+    transition: all 0.3s ease;
+}
+
+.patient-registration-search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
+}
+
+/* Table Styles */
+.patient-registration-receipts-table {
+    overflow-x: auto;
+    padding: 16px 24px;
+}
+
+.patient-registration-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.patient-registration-table-head {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.patient-registration-table-row:last-child {
+    border-bottom: none;
+}
+
+.patient-registration-table-header {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.patient-registration-table-cell {
+    padding: 16px 12px;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.patient-registration-table-cell--empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+}
+
+.patient-registration-patient-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.patient-registration-patient-phone {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: block;
+}
+
+.patient-registration-amount {
+    font-weight: 600;
+    color: var(--success-color);
+}
+
+.patient-registration-action-btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    margin-right: 8px;
+}
+
+.patient-registration-action-btn--open {
+    background: var(--primary-color);
+    color: white;
+}
+
+.patient-registration-action-btn--open:hover {
+    background: var(--primary-dark);
+}
+
+.patient-registration-action-btn--print {
+    background: var(--success-color);
+    color: white;
+}
+
+.patient-registration-action-btn--print:hover {
+    background: #218838;
+}
+
+/* Status Badges */
+.status-badge--paid {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--success-color);
+}
+
+.status-badge--pending {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: var(--warning-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .patient-registration-form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .patient-registration-form-actions {
+        flex-direction: column;
+    }
+
+    .patient-registration-search-group {
+        flex-direction: column;
+    }
+
+    .patient-registration-receipts-filters {
+        flex-wrap: wrap;
+    }
+
+    .patient-registration-table {
+        min-width: 600px;
+    }
+}

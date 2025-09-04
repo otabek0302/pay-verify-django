@@ -1,0 +1,386 @@
+{% extends 'medical_access/base.html' %}
+
+{% block title %}Procedures - PayVerify{% endblock %}
+
+{% block content %}
+<div class="procedures-page">
+    <div class="procedures-page-header">
+        <h1 class="procedures-page-title">Procedures</h1>
+        <div class="procedures-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="procedures-page-btn procedures-page-btn--secondary">Back to Dashboard</a>
+        </div>
+    </div>
+    
+    {% if user.role == 'admin' %}
+    <!-- Add Procedure Form - Only visible for admin users -->
+    <div class="procedures-form-section">
+        <div class="procedures-form-header">
+            <h2 class="procedures-form-title">Add New Procedure</h2>
+        </div>
+        <form id="addProcedureForm" class="procedures-form">
+            {% csrf_token %}
+            <div class="procedures-form-row">
+                <div class="procedures-form-group">
+                    <label for="procedure_title" class="procedures-form-label">Title</label>
+                    <input type="text" id="procedure_title" name="title" placeholder="Procedure title" class="procedures-form-input" required>
+                </div>
+                <div class="procedures-form-group">
+                    <label for="procedure_price" class="procedures-form-label">Price (sum)</label>
+                    <input type="number" id="procedure_price" name="price" placeholder="0.00" step="0.01" min="0.01" class="procedures-form-input" required>
+                </div>
+            </div>
+            
+            <div class="procedures-form-group">
+                <label for="procedure_doctors" class="procedures-form-label">Assign Doctors</label>
+                <div class="procedures-doctor-selection">
+                    <div class="procedures-doctor-checkboxes">
+                        {% for doctor in doctors %}
+                        <label class="procedures-doctor-checkbox-item">
+                            <input type="checkbox" name="doctors" value="{{ doctor.id }}" class="procedures-doctor-checkbox">
+                            <span class="procedures-checkbox-label">{{ doctor.full_name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div id="selectedDoctorsPreview" class="procedures-selected-doctors-preview"></div>
+                </div>
+            </div>
+            
+            <div class="procedures-form-actions">
+                <button type="submit" class="procedures-btn procedures-btn--primary">Save</button>
+                <button type="button" class="procedures-btn procedures-btn--secondary" onclick="clearProcedureForm()">Clear</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    
+    <div class="procedures-table-section">
+        <table class="procedures-table">
+            <thead class="procedures-table-head">
+                <tr class="procedures-table-row">
+                    <th class="procedures-table-header">ID</th>
+                    <th class="procedures-table-header">Title</th>
+                    <th class="procedures-table-header">Price</th>
+                    <th class="procedures-table-header">Doctors</th>
+                    <th class="procedures-table-header">Created</th>
+                    <th class="procedures-table-header">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="procedures-table-body">
+                {% for procedure in procedures %}
+                <tr class="procedures-table-row" data-procedure-id="{{ procedure.id }}">
+                    <td class="procedures-table-cell">{{ procedure.id }}</td>
+                    <td class="procedures-table-cell procedures-table-cell--title">{{ procedure.title }}</td>
+                    <td class="procedures-table-cell procedures-table-cell--price">{{ procedure.price }} sum</td>
+                    <td class="procedures-table-cell">
+                        {% if procedure.doctors.all %}
+                            {% for doctor in procedure.doctors.all %}
+                                <span class="procedures-doctor-tag">{{ doctor.full_name }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="procedures-no-doctors">No doctors assigned</span>
+                        {% endif %}
+                    </td>
+                    <td class="procedures-table-cell">{{ procedure.created_at|date:"d/m/Y H:i" }}</td>
+                    <td class="procedures-table-cell">
+                        <button class="procedures-action-btn procedures-action-btn--edit" onclick="editProcedure({{ procedure.id }})">Edit</button>
+                        <button class="procedures-action-btn procedures-action-btn--delete" onclick="deleteProcedure({{ procedure.id }})">Delete</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="procedures-table-row">
+                    <td colspan="6" class="procedures-table-cell procedures-table-cell--empty">No procedures found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Procedure Modal -->
+<div id="editProcedureModal" class="procedures-modal" style="display: none;">
+    <div class="procedures-modal-content">
+        <div class="procedures-modal-header">
+            <h3 class="procedures-modal-title">Edit Procedure</h3>
+            <span class="procedures-modal-close" onclick="closeEditProcedureModal()">&times;</span>
+        </div>
+        <form id="editProcedureForm" class="procedures-modal-form">
+            {% csrf_token %}
+            <input type="hidden" id="edit_procedure_id" name="procedure_id">
+            <div class="procedures-modal-form-group">
+                <label for="edit_procedure_title" class="procedures-modal-form-label">Title</label>
+                <input type="text" id="edit_procedure_title" name="title" class="procedures-modal-form-input" required>
+            </div>
+            <div class="procedures-modal-form-group">
+                <label for="edit_procedure_price" class="procedures-modal-form-label">Price (sum)</label>
+                <input type="number" id="edit_procedure_price" name="price" min="0" class="procedures-modal-form-input" required>
+            </div>
+            
+            <div class="procedures-modal-form-group">
+                <label for="edit_procedure_doctors" class="procedures-modal-form-label">Assign Doctors</label>
+                <div class="procedures-doctor-selection">
+                    <div class="procedures-doctor-checkboxes">
+                        {% for doctor in doctors %}
+                        <label class="procedures-doctor-checkbox-item">
+                            <input type="checkbox" name="doctors" value="{{ doctor.id }}" class="procedures-doctor-checkbox edit-doctor-checkbox">
+                            <span class="procedures-checkbox-label">{{ doctor.full_name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div id="editSelectedDoctorsPreview" class="procedures-selected-doctors-preview"></div>
+                </div>
+            </div>
+            <div class="procedures-modal-form-actions">
+                <button type="submit" class="procedures-btn procedures-btn--primary">Update</button>
+                <button type="button" class="procedures-btn procedures-btn--secondary" onclick="closeEditProcedureModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteProcedureModal" class="procedures-modal" style="display: none;">
+    <div class="procedures-modal-content">
+        <div class="procedures-modal-header">
+            <h3 class="procedures-modal-title">Delete Procedure</h3>
+            <span class="procedures-modal-close" onclick="closeDeleteProcedureModal()">&times;</span>
+        </div>
+        <div class="procedures-modal-body">
+            <div class="procedures-modal-warning">
+                <p>⚠️ <strong>Warning:</strong> This action cannot be undone!</p>
+                <p>Are you sure you want to delete the procedure "<span id="delete_procedure_title"></span>"?</p>
+                <p>This will also remove all doctor assignments for this procedure.</p>
+            </div>
+        </div>
+        <div class="procedures-modal-footer">
+            <button class="procedures-btn procedures-btn--danger" onclick="confirmDeleteProcedure()">Delete Procedure</button>
+            <button class="procedures-btn procedures-btn--secondary" onclick="closeDeleteProcedureModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function clearProcedureForm() {
+    document.getElementById('addProcedureForm').reset();
+}
+
+// Add procedure form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const addProcedureForm = document.getElementById('addProcedureForm');
+    const doctorCheckboxes = document.querySelectorAll('.doctor-checkbox');
+    const selectedDoctorsPreview = document.getElementById('selectedDoctorsPreview');
+    
+    // Live preview of selected doctors
+    if (doctorCheckboxes.length > 0) {
+        doctorCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateSelectedDoctorsPreview();
+            });
+        });
+    }
+    
+    function updateSelectedDoctorsPreview() {
+        const selectedCheckboxes = document.querySelectorAll('.doctor-checkbox:checked');
+        if (selectedCheckboxes.length > 0) {
+            const previewHTML = Array.from(selectedCheckboxes).map(checkbox => {
+                const label = checkbox.closest('.doctor-checkbox-item').querySelector('.checkbox-label').textContent;
+                return `<span class="selected-doctor-tag">${label}</span>`;
+            }).join('');
+            selectedDoctorsPreview.innerHTML = `<strong>Selected Doctors:</strong> ${previewHTML}`;
+            selectedDoctorsPreview.style.display = 'block';
+        } else {
+            selectedDoctorsPreview.style.display = 'none';
+        }
+    }
+    
+    if (addProcedureForm) {
+        addProcedureForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const selectedDoctors = Array.from(document.querySelectorAll('.doctor-checkbox:checked')).map(checkbox => checkbox.value);
+            
+            const data = {
+                title: formData.get('title'),
+                price: formData.get('price'),
+                doctors: selectedDoctors
+            };
+            
+            fetch('{% url "medical_access:create_procedure" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    clearProcedureForm();
+                    // Reload page to show new procedure
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error creating procedure', 'error');
+                console.error('Error:', error);
+            });
+        });
+    }
+    
+    // Edit procedure form submission
+    const editProcedureForm = document.getElementById('editProcedureForm');
+    if (editProcedureForm) {
+        editProcedureForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const selectedDoctors = Array.from(document.querySelectorAll('.edit-doctor-checkbox:checked')).map(checkbox => checkbox.value);
+            
+                           const data = {
+                   procedure_id: formData.get('procedure_id'),
+                   title: formData.get('title'),
+                   price: formData.get('price'),
+                   doctors: selectedDoctors
+               };
+            
+            fetch('{% url "medical_access:update_procedure" 0 %}'.replace('0', data.procedure_id), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    closeEditProcedureModal();
+                    // Reload page to show updated procedure
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error updating procedure', 'error');
+                console.error('Error:', error);
+            });
+        });
+    }
+    
+    // Live preview for edit modal doctor selection
+    const editDoctorCheckboxes = document.querySelectorAll('.edit-doctor-checkbox');
+    if (editDoctorCheckboxes.length > 0) {
+        editDoctorCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateEditSelectedDoctorsPreview();
+            });
+        });
+    }
+    
+    function updateEditSelectedDoctorsPreview() {
+        const selectedCheckboxes = document.querySelectorAll('.edit-doctor-checkbox:checked');
+        const previewElement = document.getElementById('editSelectedDoctorsPreview');
+        
+        if (selectedCheckboxes.length > 0) {
+            const previewHTML = Array.from(selectedCheckboxes).map(checkbox => {
+                const label = checkbox.closest('.doctor-checkbox-item').querySelector('.checkbox-label').textContent;
+                return `<span class="selected-doctor-tag">${label}</span>`;
+            }).join('');
+            previewElement.innerHTML = `<strong>Selected Doctors:</strong> ${previewHTML}`;
+            previewElement.style.display = 'block';
+        } else {
+            previewElement.style.display = 'none';
+        }
+    }
+});
+
+let currentProcedureId = null;
+
+function editProcedure(procedureId) {
+    // Get procedure data and populate edit form
+    fetch(`/medical_access/procedures/${procedureId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const procedure = data.procedure;
+                
+                // Populate edit form
+                                       document.getElementById('edit_procedure_id').value = procedure.id;
+                       document.getElementById('edit_procedure_title').value = procedure.title;
+                       document.getElementById('edit_procedure_price').value = procedure.price;
+                       
+
+                
+                // Clear and set doctor checkboxes
+                document.querySelectorAll('.edit-doctor-checkbox').forEach(checkbox => {
+                    checkbox.checked = procedure.doctors.includes(parseInt(checkbox.value));
+                });
+                
+                // Show edit modal
+                document.getElementById('editProcedureModal').style.display = 'block';
+            } else {
+                showMessage('Error loading procedure data', 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error loading procedure data', 'error');
+            console.error('Error:', error);
+        });
+}
+
+function closeEditProcedureModal() {
+    document.getElementById('editProcedureModal').style.display = 'none';
+}
+
+function deleteProcedure(procedureId) {
+    // Get procedure title for confirmation
+    const row = document.querySelector(`tr[data-procedure-id="${procedureId}"]`);
+    const title = row.querySelector('td:nth-child(2)').textContent;
+    
+    currentProcedureId = procedureId;
+    document.getElementById('delete_procedure_title').textContent = title;
+    document.getElementById('deleteProcedureModal').style.display = 'block';
+}
+
+function closeDeleteProcedureModal() {
+    document.getElementById('deleteProcedureModal').style.display = 'none';
+    currentProcedureId = null;
+}
+
+function confirmDeleteProcedure() {
+    if (!currentProcedureId) return;
+    
+    fetch(`/medical_access/delete-procedure/${currentProcedureId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeDeleteProcedureModal();
+            // Reload page to show updated list
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showMessage(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error deleting procedure', 'error');
+        console.error('Error:', error);
+    });
+}
+</script>
+{% endblock %}
