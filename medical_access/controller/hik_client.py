@@ -72,7 +72,7 @@ class HikClient:
             }
         }
         
-        print(f"[HIKCLIENT] Creating user with payload: {payload}")
+        # Creating user with provided payload
         
         # Use the working format from our test script
         url = f"{self.base}/ISAPI/AccessControl/UserInfo/Record?format=json"
@@ -81,20 +81,12 @@ class HikClient:
         r = requests.post(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
         
         if r.status_code == 200:
-            print(f"[HIKCLIENT] ✅ User created successfully")
             return True
         elif r.status_code == 400 and "employeeNoAlreadyExist" in r.text:
-            print(f"[HIKCLIENT] ✅ User already exists (expected for VISITOR)")
             return True
         else:
-            print(f"[HIKCLIENT] User creation failed: {r.status_code} - {r.text}")
             r.raise_for_status()
         
-        return True
-
-        # Use POST method (which worked in our test)
-        r = requests.post(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
-        r.raise_for_status()
         return True
 
     def delete_user(self, employee_no: str):
@@ -129,13 +121,13 @@ class HikClient:
             }
         }
         
-        print(f"[HIKCLIENT] Binding card with payload: {payload}")
+        # Binding card with provided payload
 
         # Use POST method (which worked in our test)
         r = requests.post(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
         
         if r.status_code != 200:
-            print(f"[HIKCLIENT] Card binding failed: {r.status_code} - {r.text}")
+            # Card binding failed - log error
         
         r.raise_for_status()
         return True
@@ -147,7 +139,7 @@ class HikClient:
         """
         Grant door rights to a person.
         """
-        print(f"[HIKCLIENT] Attempting to grant door access for {employee_no} to door {door_no}")
+        # Attempting to grant door access
         
         # Try the newer door authorization endpoint
         try:
@@ -160,17 +152,13 @@ class HikClient:
                 }
             }
             
-            print(f"[HIKCLIENT] Trying door authorization with payload: {payload}")
             r = requests.post(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
             
             if r.status_code == 200:
-                print(f"[HIKCLIENT] ✅ Door authorization successful for {employee_no}")
                 return True
             else:
-                print(f"[HIKCLIENT] ⚠️ Door authorization failed: {r.status_code} - {r.text}")
                 
         except Exception as e:
-            print(f"[HIKCLIENT] ⚠️ Door authorization error: {e}")
         
         # Fallback: try older endpoint
         try:
@@ -183,19 +171,14 @@ class HikClient:
                 }]
             }
             
-            print(f"[HIKCLIENT] Trying fallback door authorization with payload: {payload}")
             r = requests.put(url, json=payload, headers=JSON_HEADERS, auth=self._auth(), timeout=self.timeout, verify=False)
             
             if r.status_code == 200:
-                print(f"[HIKCLIENT] ✅ Fallback door authorization successful for {employee_no}")
                 return True
             else:
-                print(f"[HIKCLIENT] ⚠️ Fallback door authorization failed: {r.status_code} - {r.text}")
                 
         except Exception as e:
-            print(f"[HIKCLIENT] ⚠️ Fallback door authorization error: {e}")
         
-        print(f"[HIKCLIENT] ⚠️ Door authorization not working - card binding may be sufficient")
         return False
 
     def get_door_numbers(self):
@@ -263,7 +246,6 @@ class HikClient:
                     r = requests.post(url, json=payload, headers=headers, auth=self._auth(), timeout=self.timeout, verify=False)
                 
                 if r.status_code == 200:
-                    print(f"[HIKCLIENT] ✅ Remote door open successful via {url}")
                     return True
                 else:
                     errors.append(f"{url}: {r.status_code} - {r.text[:100]}")

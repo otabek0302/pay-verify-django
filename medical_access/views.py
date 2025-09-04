@@ -490,11 +490,13 @@ def create_qr(request, appointment_id):
         person_name = getattr(appointment.patient, "full_name", None) or "Patient"
         try:
             provision = _provision_to_all_doors(card_no, person_name, appointment.valid_from, appointment.valid_to)
-            print(f"[PROVISION] Card {card_no}: Success={len(provision['ok'])}, Failed={len(provision['fail'])}")
+            # Card provisioned successfully
             if provision['fail']:
-                print(f"[PROVISION] Failed doors: {provision['fail']}")
+                # Some doors failed - this is logged in the provision function
+                pass
         except Exception as e:
-            print(f"[PROVISION] Error provisioning card {card_no}: {e}")
+            # Error provisioning card - this is logged in the provision function
+            pass
             # Continue anyway - kiosk verification will still work
 
         # Return QR image
@@ -758,12 +760,11 @@ def delete_patient(request, patient_id):
 @login_required
 def appointments_view(request):
     """View for managing appointments (admin only)"""
-    print(f"DEBUG: User role: {request.user.role}, User: {request.user.username}")
+    # Check user role and redirect accordingly
     if request.user.role != User.Role.ADMIN:
-        print(f"DEBUG: Redirecting to dashboard - user role is {request.user.role}")
         return redirect('medical_access:dashboard')
     
-    print(f"DEBUG: User is admin, proceeding to appointments view")
+    # User is admin, proceeding to appointments view
     appointments = Appointment.objects.select_related(
         'patient', 'doctor', 'procedure'
     ).order_by('-appointment_date', '-appointment_time')

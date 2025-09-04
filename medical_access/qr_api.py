@@ -133,9 +133,11 @@ def qr_verify_api(request):
         for door in Door.objects.all():
             try:
                 HikClient(door.terminal_ip, door.terminal_username, door.terminal_password).delete_user(emp)
-                print(f"[Revoke][{door.name}] Deleted user {emp}")
+                # User deleted successfully
+                pass
             except Exception as e:
-                print(f"[Revoke][{door.name}] delete {emp} failed: {e}")
+                # Log error but continue
+                pass
         
         # Log successful access
         AccessEvent.objects.create(
@@ -256,7 +258,8 @@ def remote_open_door_api(request):
                 client.remote_open_door()
                 opened_count += 1
             except Exception as e:
-                print(f"[REMOTE OPEN] Failed to open {door.name}: {e}")
+                # Failed to open door - log error but continue
+                pass
         
         # Mark as used if successful
         if opened_count > 0 and appointment.status == Appointment.Status.ACTIVE:
