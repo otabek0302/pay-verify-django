@@ -257,15 +257,21 @@ def create_doctor(request):
     
     try:
         data = json.loads(request.body)
-        full_name = data.get('full_name')
         
-        if not full_name:
-            return JsonResponse({'success': False, 'message': 'Full name is required'}, status=400)
-        
-        # Split full name into first and last name
-        name_parts = full_name.split()
-        first_name = name_parts[0] if name_parts else ''
-        last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        # Handle both full_name and separate first_name/last_name
+        if 'full_name' in data:
+            full_name = data.get('full_name')
+            if not full_name:
+                return JsonResponse({'success': False, 'message': 'Full name is required'}, status=400)
+            # Split full name into first and last name
+            name_parts = full_name.split()
+            first_name = name_parts[0] if name_parts else ''
+            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        else:
+            first_name = data.get('first_name', '').strip()
+            last_name = data.get('last_name', '').strip()
+            if not first_name and not last_name:
+                return JsonResponse({'success': False, 'message': 'First name or last name is required'}, status=400)
         
         # Create doctor directly
         doctor = Doctor.objects.create(
@@ -466,8 +472,9 @@ def create_qr(request, appointment_id):
         if not appointment.paid:
             return JsonResponse({"error": "Payment required"}, status=400)
         
-        if appointment.appointment_datetime <= timezone.now():
-            return JsonResponse({"error": "Appointment has already passed"}, status=400)
+        # Only check if appointment is active, not if it's in the past
+        if appointment.status != 'active':
+            return JsonResponse({"error": "Appointment is not active"}, status=400)
 
         # Use existing card_no from appointment
         card_no = appointment.card_no

@@ -169,6 +169,15 @@
     cursor: pointer;
 }
 
+.appointments-action-btn--view {
+    background: var(--success-color);
+    color: white;
+}
+
+.appointments-action-btn--view:hover {
+    background: var(--success-dark);
+}
+
 .appointments-action-btn--edit {
     background: var(--primary-color);
     color: white;

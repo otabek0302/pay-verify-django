@@ -39,18 +39,6 @@
                     <label>Status:</label>
                     <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
                 </div>
-                {% if appointment.valid_from %}
-                <div class="info-item">
-                    <label>Valid From:</label>
-                    <span>{{ appointment.valid_from|date:"F d, Y g:i A" }}</span>
-                </div>
-                {% endif %}
-                {% if appointment.valid_to %}
-                <div class="info-item">
-                    <label>Valid Until:</label>
-                    <span>{{ appointment.valid_to|date:"F d, Y g:i A" }}</span>
-                </div>
-                {% endif %}
             </div>
             
         </div>
@@ -90,7 +78,11 @@
                     <span class="qr-card">Card: {{ appointment.card_no }}</span>
                     <span class="qr-status status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
                     <span class="qr-validity">
-                        Valid: {{ appointment.valid_from|time:"g:i A" }} - {{ appointment.valid_to|time:"g:i A" }}
+                        {% if appointment.valid_from and appointment.valid_to %}
+                            Valid: {{ appointment.valid_from|date:"M d, Y g:i A" }} - {{ appointment.valid_to|date:"M d, Y g:i A" }}
+                        {% else %}
+                            Valid: Not set
+                        {% endif %}
                     </span>
                 </div>
                 <div class="qr-actions">

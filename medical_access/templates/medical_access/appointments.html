@@ -57,6 +57,7 @@
                         </span>
                     </td>
                     <td class="appointments-table-cell">
+                        <button class="appointments-action-btn appointments-action-btn--view" onclick="viewAppointment({{ appointment.id }})">Open</button>
                         <button class="appointments-action-btn appointments-action-btn--edit" onclick="editAppointment({{ appointment.id }})">Edit</button>
                         <button class="appointments-action-btn appointments-action-btn--delete" onclick="deleteAppointment({{ appointment.id }})">Delete</button>
                     </td>
@@ -159,6 +160,12 @@
 {% block extra_js %}
 <script>
 let currentAppointmentId = null;
+
+// View Appointment Function
+function viewAppointment(appointmentId) {
+    // Redirect to appointment detail page
+    window.location.href = `/medical_access/appointment/${appointmentId}/`;
+}
 
 // Edit Appointment Functions
 function editAppointment(appointmentId) {
