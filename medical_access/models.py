@@ -127,6 +127,8 @@ class Patient(models.Model):
 class Appointment(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Active'
+        ENTER = 'enter', 'Enter'
+        LEAVE = 'leave', 'Leave'
         USED = 'used', 'Used'
         EXPIRED = 'expired', 'Expired'
         REVOKED = 'revoked', 'Revoked'

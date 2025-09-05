@@ -41,75 +41,115 @@ def qr_verify(request):
                 'message': 'No card number provided'
             }, status=400)
         
-        # Find appointment (active or used)
+        # Find appointment with any status
         now = timezone.now()
         
-        # First try to find active appointment with valid time range
-        appointment = Appointment.objects.filter(
-            card_no=card_no,
-            status='active'
-        ).filter(
-            models.Q(valid_from__isnull=True) | models.Q(valid_from__lte=now),
-            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=now)
-        ).first()
+        # Find appointment by card number (any status)
+        appointment = Appointment.objects.filter(card_no=card_no).first()
         
         if not appointment:
-            # If no active appointment found with time range, try without time constraints
-            appointment = Appointment.objects.filter(
-                card_no=card_no,
-                status='active'
-            ).first()
+            logger.warning(f"[QR VERIFY] ❌ No appointment found for card {card_no}")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Access denied - invalid pass',
+                'cardNo': card_no
+            }, status=403)
         
-        if not appointment:
-            # If no active appointment found, check if there's a used appointment (already scanned)
-            appointment = Appointment.objects.filter(
-                card_no=card_no,
-                status='used'
-            ).first()
-            
-            if appointment:
-                # Return success for already used appointment (prevent multiple scans)
-                logger.info(f"[QR VERIFY] ✅ Access granted for already used card {card_no}")
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'Access granted (already used)',
-                    'cardNo': card_no,
-                    'employeeNo': f"APT{appointment.id}"
-                })
-            else:
-                # No appointment found at all
-                logger.warning(f"[QR VERIFY] ❌ No valid appointment found for card {card_no}")
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Access denied - invalid or expired pass',
-                    'cardNo': card_no
-                }, status=403)
+        # Check if appointment is valid (paid and within time range)
+        if not appointment.paid:
+            logger.warning(f"[QR VERIFY] ❌ Appointment {appointment.id} not paid")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Access denied - appointment not paid',
+                'cardNo': card_no
+            }, status=403)
         
-        # Only update status if appointment is active
+        # Check time validity
+        if appointment.valid_from and appointment.valid_from > now:
+            logger.warning(f"[QR VERIFY] ❌ Appointment {appointment.id} not yet valid")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Access denied - pass not yet valid',
+                'cardNo': card_no
+            }, status=403)
+        
+        if appointment.valid_to and appointment.valid_to < now:
+            logger.warning(f"[QR VERIFY] ❌ Appointment {appointment.id} expired")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Access denied - pass expired',
+                'cardNo': card_no
+            }, status=403)
+        
+        # Implement enter/leave logic
         if appointment.status == 'active':
-            appointment.status = 'used'
+            # First scan: Enter
+            appointment.status = 'enter'
             appointment.used_at = now
             appointment.save()
             
-            # Create access event
+            # Create access event for entry
             AccessEvent.objects.create(
                 appointment=appointment,
                 door=None,  # Will be set by event listener
                 result=AccessEvent.Result.ALLOW,
-                reason='Valid QR code scanned',
+                reason='Entry - Valid QR code scanned',
                 card_no=card_no
             )
             
-            logger.info(f"[QR VERIFY] ✅ Access granted for card {card_no}, appointment {appointment.id} marked as used")
+            logger.info(f"[QR VERIFY] ✅ ENTRY granted for card {card_no}, appointment {appointment.id} marked as enter")
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Access granted - Entry',
+                'cardNo': card_no,
+                'employeeNo': f"APT{appointment.id}",
+                'action': 'enter'
+            })
+            
+        elif appointment.status == 'enter':
+            # Second scan: Leave
+            appointment.status = 'leave'
+            appointment.save()
+            
+            # Create access event for exit
+            AccessEvent.objects.create(
+                appointment=appointment,
+                door=None,  # Will be set by event listener
+                result=AccessEvent.Result.ALLOW,
+                reason='Exit - Valid QR code scanned',
+                card_no=card_no
+            )
+            
+            # TODO: Remove card from VISITOR user on terminals (when API is available)
+            # For now, we'll just log this requirement
+            logger.info(f"[QR VERIFY] ✅ EXIT granted for card {card_no}, appointment {appointment.id} marked as leave")
+            logger.info(f"[QR VERIFY] TODO: Remove card {card_no} from VISITOR user on terminals")
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Access granted - Exit',
+                'cardNo': card_no,
+                'employeeNo': f"APT{appointment.id}",
+                'action': 'leave'
+            })
+            
+        elif appointment.status == 'leave':
+            # Already left - deny access
+            logger.warning(f"[QR VERIFY] ❌ Appointment {appointment.id} already left")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Access denied - already left',
+                'cardNo': card_no
+            }, status=403)
+            
         else:
-            logger.info(f"[QR VERIFY] ✅ Access granted for already used card {card_no}")
-        
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Access granted',
-            'cardNo': card_no,
-            'employeeNo': f"APT{appointment.id}"
-        })
+            # Other statuses (used, expired, revoked) - deny access
+            logger.warning(f"[QR VERIFY] ❌ Appointment {appointment.id} status: {appointment.status}")
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Access denied - status: {appointment.status}',
+                'cardNo': card_no
+            }, status=403)
             
     except Exception as e:
         logger.error(f"[QR VERIFY] Error: {e}")
