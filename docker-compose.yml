@@ -32,6 +32,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_}
       - DEBUG=${DEBUG:-False}
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*
+      - PAYVERIFY_TERMINAL_TIMEOUT=${PAYVERIFY_TERMINAL_TIMEOUT:-5}
     depends_on:
       db:
         condition: service_healthy
@@ -39,17 +40,26 @@ services:
       sh -c "
       python manage.py migrate &&
       python manage.py collectstatic --noinput &&
-      gunicorn controller.wsgi:application --bind 0.0.0.0:8000 --workers 3
+      python create_superuser.py &&
+      gunicorn controller.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
       "
     ports:
       - "8000:8000"
     volumes:
       - static_volume:/app/static
+      - media_volume:/app/media
     networks: [ pvnet ]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   pgdata:
   static_volume:
+  media_volume:
 
 networks:
   pvnet:

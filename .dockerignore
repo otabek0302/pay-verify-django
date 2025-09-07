@@ -64,6 +64,10 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Pipenv (using requirements.txt instead)
+# Documentation
+README.md
+README_DOCKER.md
+
+# Pipenv
 Pipfile
 Pipfile.lock
