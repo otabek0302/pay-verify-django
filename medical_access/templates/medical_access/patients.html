@@ -18,8 +18,8 @@
                     <th class="patients-table-header">ID</th>
                     <th class="patients-table-header">Name</th>
                     <th class="patients-table-header">Phone</th>
+                    <th class="patients-table-header">Passport</th>
                     <th class="patients-table-header">Appointments</th>
-                    <th class="patients-table-header">QR Scanned</th>
                     <th class="patients-table-header">Created</th>
                     <th class="patients-table-header">Actions</th>
                 </tr>
@@ -30,20 +30,22 @@
                     <td class="patients-table-cell">{{ patient.id }}</td>
                     <td class="patients-table-cell patients-table-cell--name">{{ patient.full_name }}</td>
                     <td class="patients-table-cell patients-table-cell--phone">{{ patient.phone|default:"—" }}</td>
+                    <td class="patients-table-cell patients-table-cell--passport">
+                        {% if patient.passport_series and patient.passport_number %}
+                            {{ patient.passport_series }} {{ patient.passport_number }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td class="patients-table-cell patients-table-cell--appointments">
                         <span class="status-badge status-badge--info">{{ patient.appointments.count }}</span>
                     </td>
-                    <td class="patients-table-cell patients-table-cell--qr-scanned">
-                        {% if patient.access_events.exists %}
-                            <span class="status-badge status-badge--completed">Scanned</span>
-                        {% else %}
-                            <span class="status-badge status-badge--pending">Not Scanned</span>
-                        {% endif %}
-                    </td>
                     <td class="patients-table-cell">{{ patient.created_at|date:"d/m/Y H:i" }}</td>
                     <td class="patients-table-cell">
-                        <button class="patients-action-btn patients-action-btn--edit" onclick="editPatient({{ patient.id }})">Edit</button>
-                        <button class="patients-action-btn patients-action-btn--delete" onclick="deletePatient({{ patient.id }})">Delete</button>
+                        <div class="patients-actions">
+                            <button class="patients-action-btn patients-action-btn--edit" onclick="editPatient({{ patient.id }})">Edit</button>
+                            <button class="patients-action-btn patients-action-btn--delete" onclick="deletePatient({{ patient.id }})">Delete</button>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -54,6 +56,36 @@
             </tbody>
         </table>
     </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} patients
+        </div>
+        <div class="pagination">
+            <div class="pagination-numbers">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-link pagination-link--current">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
+                    {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                        <span class="pagination-ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="pagination-nav">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Edit Patient Modal -->
@@ -77,6 +109,14 @@
             <div class="patients-modal-form-group">
                 <label for="edit_phone" class="patients-modal-form-label">Phone</label>
                 <input type="tel" id="edit_phone" name="phone" placeholder="+998 ..." class="patients-modal-form-input">
+            </div>
+            <div class="patients-modal-form-group">
+                <label for="edit_passport_series" class="patients-modal-form-label">Passport Series</label>
+                <input type="text" id="edit_passport_series" name="passport_series" placeholder="AA" class="patients-modal-form-input">
+            </div>
+            <div class="patients-modal-form-group">
+                <label for="edit_passport_number" class="patients-modal-form-label">Passport Number</label>
+                <input type="text" id="edit_passport_number" name="passport_number" placeholder="1234567" class="patients-modal-form-input">
             </div>
             <div class="patients-modal-form-actions">
                 <button type="button" class="patients-btn patients-btn--secondary" onclick="closeEditPatientModal()">Cancel</button>
@@ -112,6 +152,7 @@
 <script>
 let currentPatientId = null;
 
+
 // Edit Patient Functions
 function editPatient(patientId) {
     currentPatientId = patientId;
@@ -129,6 +170,8 @@ function editPatient(patientId) {
                 document.getElementById('edit_first_name').value = patient.first_name;
                 document.getElementById('edit_last_name').value = patient.last_name;
                 document.getElementById('edit_phone').value = patient.phone || '';
+                document.getElementById('edit_passport_series').value = patient.passport_series || '';
+                document.getElementById('edit_passport_number').value = patient.passport_number || '';
                 
                 // Show the modal
                 document.getElementById('editPatientModal').style.display = 'block';
@@ -276,8 +319,9 @@ function showMessage(message, type) {
     }, 5000);
 }
 
-// Add event listener for edit form
+// Add event listeners for forms
 document.addEventListener('DOMContentLoaded', function() {
+    // Edit Patient form
     const editForm = document.getElementById('editPatientForm');
     if (editForm) {
         editForm.addEventListener('submit', submitEditPatient);

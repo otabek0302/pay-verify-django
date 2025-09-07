@@ -25,10 +25,11 @@
 }
 
 .doctors-page-btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border: none;
     border-radius: var(--radius);
     font-size: 12px;
+    line-height: 1.5;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -36,6 +37,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
 .doctors-page-btn--secondary {
@@ -212,16 +215,28 @@
     font-size: 12px;
 }
 
+.doctors-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
 .doctors-action-btn {
     padding: 6px 12px;
     border-radius: var(--radius);
-    font-size: 11px;
+    font-size: 12px;
+    line-height: 1.5;
     font-weight: 500;
     text-decoration: none;
     transition: all 0.3s ease;
-    margin-right: 8px;
     border: none;
     cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .doctors-action-btn--edit {
@@ -388,7 +403,7 @@
 .doctors-procedure-badge {
     display: inline-block;
     padding: 4px 8px;
-    background: var(--primary);
+    background: var(--primary-color);
     color: var(--text-primary);
     border-radius: var(--radius);
     font-size: 11px;

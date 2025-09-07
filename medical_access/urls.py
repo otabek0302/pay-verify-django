@@ -1,10 +1,6 @@
 from django.urls import path
 from . import views
-from .views_hik import hik_event_webhook
-from .views_api import qr_verify
-
-# Force load signals to ensure they are registered
-from . import signals  # noqa
+from .views_events import hik_event_receiver, dmed_create_appointment, dmed_appointment_status
 
 app_name = 'medical_access'
 
@@ -16,37 +12,60 @@ urlpatterns = [
 
     path('patient-registration/', views.patient_registration_view, name='patient_registration'),
     path('doctors/', views.doctors_view, name='doctors'),
-    path('procedures/', views.procedures_view, name='procedures'),
     path('patients/', views.patients_view, name='patients'),
+    path('appointments/', views.appointments_view, name='appointments'),
+    
     path('appointment/<int:appointment_id>/', views.appointment_detail, name='appointment_detail'),
     path('appointment/<int:appointment_id>/qr/', views.create_qr, name='create_qr'),
     path('appointment/<int:appointment_id>/receipt/', views.generate_receipt, name='generate_receipt'),
+    
+    # Terminals
+    path('terminals/', views.terminals_view, name='terminals'),
+    path('terminals/<int:terminal_id>/open/', views.terminal_open_door_api, name='terminal_open_door'),
+    
+    # QR Scanner/Kiosk
+    path('kiosk/', views.kiosk_view, name='kiosk'),
+    path('verify-appointment/<str:code>/', views.verify_appointment, name='verify_appointment'),
+    
+    # API endpoints
     path('create-appointment/', views.create_appointment, name='create_appointment'),
     path('create-doctor/', views.create_doctor, name='create_doctor'),
-    path('create-procedure/', views.create_procedure, name='create_procedure'),
+    path('create-patient/', views.create_patient, name='create_patient'),
+    
+    # Doctor CRUD
+    path('doctors/<int:doctor_id>/', views.get_doctor, name='get_doctor'),
     path('update-doctor/<int:doctor_id>/', views.update_doctor, name='update_doctor'),
     path('delete-doctor/<int:doctor_id>/', views.delete_doctor, name='delete_doctor'),
-    path('procedures/<int:procedure_id>/', views.get_procedure, name='get_procedure'),
-    path('procedures/<int:procedure_id>/doctors/', views.get_procedure_doctors, name='get_procedure_doctors'),
-    path('update-procedure/<int:procedure_id>/', views.update_procedure, name='update_procedure'),
-    path('delete-procedure/<int:procedure_id>/', views.delete_procedure, name='delete_procedure'),
-    # Patient CRUD operations
-    path('patients/create/', views.create_patient, name='create_patient'),
+    
+    # Patient CRUD
     path('patients/<int:patient_id>/', views.get_patient, name='get_patient'),
     path('patients/<int:patient_id>/update/', views.update_patient, name='update_patient'),
     path('patients/<int:patient_id>/delete/', views.delete_patient, name='delete_patient'),
-    path('appointments/', views.appointments_view, name='appointments'),
-    path('appointments/create/', views.create_appointment_admin, name='create_appointment_admin'),
+    
+    # Appointment CRUD
     path('appointments/<int:appointment_id>/update/', views.update_appointment, name='update_appointment'),
     path('appointments/<int:appointment_id>/delete/', views.delete_appointment, name='delete_appointment'),
-    path('appointment/<int:appointment_id>/revoke/', views.revoke_pass, name='revoke_pass'),
     
-    # QR Verification API
-    path('api/qr/verify/', qr_verify, name='qr_verify_api'),
-    path('api/door/remote-open/', views.remote_open_door_api, name='remote_open_door'),
-    path('kiosk/', views.kiosk_view, name='kiosk'),
-    path('appointment/<int:appointment_id>/provision/', views.provision_appointment_to_terminals, name='provision_appointment'),
+    # Admin terminal actions
+    path('admin/terminals/<int:pk>/health/', views.admin_terminal_health, name='admin_terminal_health'),
+    path('admin/terminals/<int:pk>/open/', views.admin_terminal_open, name='admin_terminal_open'),
     
-    # Hikvision Event Listener
-    path('hik/events/', hik_event_webhook, name='hik_event_webhook'),
+    # REMOVED: Appointment repush API - Not needed for Remote-Only Mode
+    
+    # QR validation and door control
+    path('terminals/<int:terminal_id>/validate-qr/', views.validate_qr_and_open_door, name='validate_qr_and_open_door'),
+    
+    # Scan event logging (console only)
+    path('scan-events/', views.log_scan_event, name='log_scan_event'),
+    path('terminals/<str:terminal_ip>/mode/', views.get_terminal_mode_api, name='get_terminal_mode'),
+    
+    # Get recent scans from terminal
+    path('terminals/<int:pk>/last-scans/', views.last_scans, name='terminal_last_scans'),
+    
+    # Hikvision event push receiver
+    path('hik/events/', hik_event_receiver, name='hik_events'),
+    
+    # DMED Platform Integration APIs
+    path('dmed/appointments/', dmed_create_appointment, name='dmed_create_appointment'),
+    path('dmed/appointments/<int:appointment_id>/status/', dmed_appointment_status, name='dmed_appointment_status'),
 ]

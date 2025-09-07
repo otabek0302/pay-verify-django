@@ -8,44 +8,20 @@
         <h1 class="doctors-page-title">Doctors</h1>
         <div class="doctors-page-actions">
             <a href="{% url 'medical_access:dashboard' %}" class="doctors-page-btn doctors-page-btn--secondary">Back to Dashboard</a>
+            {% if user.role == 'admin' or user.role == 'super_admin' %}
+            <button class="doctors-page-btn doctors-page-btn--primary" onclick="openAddDoctorModal()">Add New Doctor</button>
+            {% endif %}
         </div>
     </div>
-    
-    {% if user.role == 'admin' %}
-    <!-- Add Doctor Form - Only visible for admin users -->
-    <div class="doctors-form-section">
-        <div class="doctors-form-header">
-            <h2 class="doctors-form-title">Add New Doctor</h2>
-        </div>
-        <form id="addDoctorForm" class="doctors-form">
-            {% csrf_token %}
-            <div class="doctors-form-row">
-                <div class="doctors-form-group">
-                    <label for="doctor_first_name" class="doctors-form-label">First Name</label>
-                    <input type="text" id="doctor_first_name" name="first_name" placeholder="First name" class="doctors-form-input" required>
-                </div>
-                <div class="doctors-form-group">
-                    <label for="doctor_last_name" class="doctors-form-label">Last Name</label>
-                    <input type="text" id="doctor_last_name" name="last_name" placeholder="Last name" class="doctors-form-input" required>
-                </div>
-            </div>
-            <div class="doctors-form-actions">
-                <button type="submit" class="doctors-btn doctors-btn--primary">Save</button>
-                <button type="button" class="doctors-btn doctors-btn--secondary" onclick="clearDoctorForm()">Clear</button>
-            </div>
-        </form>
-
-    </div>
-    {% endif %}
     
     <div class="doctors-table-section">
         <table class="doctors-table">
             <thead class="doctors-table-head">
                 <tr class="doctors-table-row">
                     <th class="doctors-table-header">ID</th>
-                    <th class="doctors-table-header">First Name</th>
-                    <th class="doctors-table-header">Last Name</th>
-                    <th class="doctors-table-header">Procedures</th>
+                    <th class="doctors-table-header">Name</th>
+                    <th class="doctors-table-header">Procedure</th>
+                    <th class="doctors-table-header">Price</th>
                     <th class="doctors-table-header">Created</th>
                     <th class="doctors-table-header">Actions</th>
                 </tr>
@@ -54,22 +30,16 @@
                 {% for doctor in doctors %}
                 <tr class="doctors-table-row" data-doctor-id="{{ doctor.id }}">
                     <td class="doctors-table-cell">{{ doctor.id }}</td>
-                    <td class="doctors-table-cell doctors-table-cell--first-name">{{ doctor.first_name }}</td>
-                    <td class="doctors-table-cell doctors-table-cell--last-name">{{ doctor.last_name }}</td>
-                    <td class="doctors-table-cell doctors-table-cell--procedures">
-                        {% if doctor.procedures.exists %}
-                            {% for procedure in doctor.procedures.all %}
-                                <span class="doctors-procedure-badge">{{ procedure.title }}</span>{% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                        {% else %}
-                            <span class="doctors-no-procedures">-</span>
-                        {% endif %}
-                    </td>
+                    <td class="doctors-table-cell doctors-table-cell--name">{{ doctor.full_name }}</td>
+                    <td class="doctors-table-cell doctors-table-cell--procedure">{{ doctor.procedure }}</td>
+                    <td class="doctors-table-cell doctors-table-cell--price">{{ doctor.price }} sum</td>
                     <td class="doctors-table-cell">{{ doctor.created_at|date:"d/m/Y H:i" }}</td>
                     <td class="doctors-table-cell">
-                        {% if user.role == 'admin' %}
-                        <button class="doctors-action-btn doctors-action-btn--edit" onclick="editDoctorFromRow(this)">Edit</button>
-                        <button class="doctors-action-btn doctors-action-btn--delete" onclick="deleteDoctor({{ doctor.id }}, '{{ doctor.full_name|escapejs }}')">Delete</button>
+                        {% if user.role == 'admin' or user.role == 'super_admin' %}
+                        <div class="doctors-actions">
+                            <button class="doctors-action-btn doctors-action-btn--edit" onclick="editDoctorFromRow(this)">Edit</button>
+                            <button class="doctors-action-btn doctors-action-btn--delete" onclick="deleteDoctor({{ doctor.id }}, '{{ doctor.full_name|escapejs }}')">Delete</button>
+                        </div>
                         {% else %}
                         <span class="doctors-no-actions">No actions available</span>
                         {% endif %}
@@ -82,6 +52,69 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} doctors
+        </div>
+        <div class="pagination">
+            <div class="pagination-numbers">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-link pagination-link--current">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
+                    {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                        <span class="pagination-ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="pagination-nav">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Doctor Modal -->
+<div id="addDoctorModal" class="doctors-modal" style="display: none;">
+    <div class="doctors-modal-content">
+        <div class="doctors-modal-header">
+            <h3 class="doctors-modal-title">Add New Doctor</h3>
+            <span class="doctors-modal-close" onclick="closeAddDoctorModal()">&times;</span>
+        </div>
+        <form id="addDoctorForm" class="doctors-modal-form">
+            {% csrf_token %}
+            <div class="doctors-modal-form-group">
+                <label for="add_doctor_first_name" class="doctors-modal-form-label">First Name</label>
+                <input type="text" id="add_doctor_first_name" name="first_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="add_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
+                <input type="text" id="add_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="add_doctor_procedure" class="doctors-modal-form-label">Procedure</label>
+                <input type="text" id="add_doctor_procedure" name="procedure" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="add_doctor_price" class="doctors-modal-form-label">Price (sum)</label>
+                <input type="number" id="add_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-actions">
+                <button type="submit" class="doctors-btn doctors-btn--primary">Add Doctor</button>
+                <button type="button" class="doctors-btn doctors-btn--secondary" onclick="closeAddDoctorModal()">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -102,6 +135,14 @@
             <div class="doctors-modal-form-group">
                 <label for="edit_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
                 <input type="text" id="edit_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="edit_doctor_procedure" class="doctors-modal-form-label">Procedure</label>
+                <input type="text" id="edit_doctor_procedure" name="procedure" class="doctors-modal-form-input" required>
+            </div>
+            <div class="doctors-modal-form-group">
+                <label for="edit_doctor_price" class="doctors-modal-form-label">Price (sum)</label>
+                <input type="number" id="edit_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required>
             </div>
             <div class="doctors-modal-form-actions">
                 <button type="submit" class="doctors-btn doctors-btn--primary">Update</button>
@@ -135,17 +176,25 @@
 <script>
 let currentDoctorId = null;
 
-function clearDoctorForm() {
+// Add Doctor Modal Functions
+function openAddDoctorModal() {
+    document.getElementById('addDoctorModal').style.display = 'block';
+}
+
+function closeAddDoctorModal() {
+    document.getElementById('addDoctorModal').style.display = 'none';
     document.getElementById('addDoctorForm').reset();
 }
 
-function editDoctor(doctorId, firstName, lastName) {
+function editDoctor(doctorId, firstName, lastName, procedure, price) {
     currentDoctorId = doctorId;
     
     // Populate the edit form
     document.getElementById('edit_doctor_id').value = doctorId;
     document.getElementById('edit_doctor_first_name').value = firstName;
     document.getElementById('edit_doctor_last_name').value = lastName;
+    document.getElementById('edit_doctor_procedure').value = procedure;
+    document.getElementById('edit_doctor_price').value = price;
     
     // Show the modal
     document.getElementById('editDoctorModal').style.display = 'block';
@@ -158,12 +207,18 @@ function editDoctorFromRow(button) {
     // Get the doctor ID from the data attribute
     const doctorId = row.getAttribute('data-doctor-id');
     
-    // Get the current first name and last name from the table cells
-    const firstName = row.cells[1].textContent.trim();
-    const lastName = row.cells[2].textContent.trim();
+    // Get the current data from the table cells
+    const name = row.cells[1].textContent.trim();
+    const procedure = row.cells[2].textContent.trim();
+    const price = row.cells[3].textContent.replace(' sum', '').trim();
+    
+    // Split name into first and last name
+    const nameParts = name.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
     
     // Call the existing editDoctor function with current data
-    editDoctor(doctorId, firstName, lastName);
+    editDoctor(doctorId, firstName, lastName, procedure, price);
 }
 
 function closeEditModal() {
@@ -219,7 +274,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(this);
             const data = {
                 first_name: formData.get('first_name'),
-                last_name: formData.get('last_name')
+                last_name: formData.get('last_name'),
+                procedure: formData.get('procedure'),
+                price: formData.get('price')
             };
             
             fetch('{% url "medical_access:create_doctor" %}', {
@@ -257,7 +314,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(this);
             const data = {
                 first_name: formData.get('first_name').trim(),
-                last_name: formData.get('last_name').trim()
+                last_name: formData.get('last_name').trim(),
+                procedure: formData.get('procedure').trim(),
+                price: formData.get('price')
             };
             
             fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace('0', currentDoctorId), {
@@ -275,10 +334,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update the table row
                     const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
                     if (row) {
-                        const firstNameCell = row.querySelector('.doctors-table-cell--first-name');
-                        const lastNameCell = row.querySelector('.doctors-table-cell--last-name');
-                        if (firstNameCell) firstNameCell.textContent = data.doctor.first_name;
-                        if (lastNameCell) lastNameCell.textContent = data.doctor.last_name;
+                        row.cells[1].textContent = data.doctor.first_name + ' ' + data.doctor.last_name;
+                        row.cells[2].textContent = data.doctor.procedure;
+                        row.cells[3].textContent = data.doctor.price + ' sum';
                     }
                     closeEditModal();
                 } else {

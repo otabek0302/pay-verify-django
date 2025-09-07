@@ -13,10 +13,6 @@ DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,*').split(',')
 
-# Hikvision Terminal Settings
-HIK_VISITOR_EMPLOYEE_NO = os.environ.get('HIK_VISITOR_EMPLOYEE_NO', 'VISITOR')
-
-
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -28,6 +24,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
+    "core",
     "medical_access.apps.MedicalAccessConfig",
 ]
 
@@ -40,7 +37,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "medical_access.middleware.Custom404Middleware",
+    # REMOVED: Custom404Middleware - File deleted for Remote-Only cleanup
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -80,17 +77,30 @@ TEMPLATES = [
 WSGI_APPLICATION = "controller.wsgi.application"
 
 # Database
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get('POSTGRES_DB', 'payverify'),
-        "USER": os.environ.get('POSTGRES_USER', 'payverify'),
-        "PASSWORD": os.environ.get('POSTGRES_PASSWORD', 'payverify'),
-        "HOST": os.environ.get('POSTGRES_HOST', 'localhost'),
-        "PORT": os.environ.get('POSTGRES_PORT', '5432'),
-    }
-}
+# DMED Platform Integration Settings
+DMED_API_TOKEN = os.environ.get('DMED_API_TOKEN', 'your-dmed-api-token')
+DMED_API_URL = os.environ.get('DMED_API_URL', 'https://api.dmed.com')
+DMED_SHARED_SECRET = os.environ.get('DMED_SHARED_SECRET', 'your-shared-secret')
 
+# Use SQLite for local development, PostgreSQL for production
+if os.environ.get('USE_POSTGRES', 'False').lower() == 'true':
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get('POSTGRES_DB', 'payverify'),
+            "USER": os.environ.get('POSTGRES_USER', 'payverify'),
+            "PASSWORD": os.environ.get('POSTGRES_PASSWORD', 'payverify'),
+            "HOST": os.environ.get('POSTGRES_HOST', 'localhost'),
+            "PORT": os.environ.get('POSTGRES_PORT', '5432'),
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -157,10 +167,10 @@ SIMPLE_JWT = {
     'JTI_CLAIM': 'jti',
 }
 
-# Hikvision Terminal Settings
-HIK_USE_HTTPS = False          # set True if your terminals use HTTPS
-HIK_TIMEOUT = 8                # seconds
-HIK_DOOR_NO = 1                # most terminals are single-door = 1
+# PayVerify / Terminals config
+PAYVERIFY_TERMINAL_TIMEOUT = 5           # seconds
+PAYVERIFY_TERMINAL_SUBNET = "192.168.100."
+PAYVERIFY_EVENT_STREAM_CONNECT = True    # enables event listener to auto-connect
 
 # Logging Configuration
 LOGGING = {
@@ -168,6 +178,6 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
-        "medical_access": {"handlers": ["console"], "level": "INFO"},
+        "django": {"handlers": ["console"], "level": "WARNING"},
     },
 }

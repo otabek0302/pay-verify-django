@@ -1,56 +1,15 @@
-import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
-from django.conf import settings
-from datetime import timedelta
-from .models import Appointment, Door
-from .controller.hik_client import HikClient
-
-log = logging.getLogger("medical_access")
-
-def _emp(appt_id: int) -> str:
-    return f"APT{appt_id}"
-
-def _generate_card_no() -> str:
-    """Generate 8-digit numeric card number"""
-    import random
-    return str(random.randint(10000000, 99999999))
-
-# Simple test signal - this should fire for ANY appointment save
-@receiver(post_save, sender=Appointment)
-def test_signal_working(sender, instance: Appointment, created, **kwargs):
-    """Test signal to verify signals are working"""
-    # Signal fired for appointment
+from .models import Appointment
 
 @receiver(post_save, sender=Appointment)
-def provision_on_paid_appointment(sender, instance: Appointment, created, **kwargs):
-    """Simple signal - when appointment is created, add card to existing VISITOR user"""
-    # Only act when appointment is paid and has valid_from/valid_to
-    if not instance.paid or not instance.valid_from or not instance.valid_to:
+def on_appt_created(sender, instance: Appointment, created, **kwargs):
+    """Remote-Only Mode: No card provisioning - verification happens remotely"""
+    if not created or not instance.qr_code:
         return
-
-    # Use existing VISITOR user (don't create new users)
-    emp = getattr(settings, 'HIK_VISITOR_EMPLOYEE_NO', 'VISITOR')
     
-    log.info(f"Appointment {instance.id} created with card {instance.card_no} - adding card to VISITOR user")
-    
-    # Since card binding API is not supported, we'll just log the requirement
-    # In production, you'll need to manually add this card to the VISITOR user on each terminal
-    for door in Door.objects.all():
-        log.info(f"MANUAL SETUP REQUIRED: Add card {instance.card_no} to VISITOR user on {door.name} ({door.terminal_ip})")
-    
-    # TODO: When card binding API becomes available, uncomment this code:
-    # for door in Door.objects.all():
-    #     try:
-    #         client = HikClient(door.terminal_ip, door.terminal_username, door.terminal_password)
-    #         
-    #         # Test connection first
-    #         client.ping()
-    #         
-    #         # Only add card to existing VISITOR user (don't create new user)
-    #         client.bind_card(emp, instance.card_no)
-    #         
-    #     except Exception as e:
-    #         # Log error but continue with other doors
-    #         log.error(f"Failed to add card to VISITOR on {door.name}: {e}")
+    # Remote-Only Mode: Cards are not stored on terminals
+    # Verification happens via remote API calls only
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Remote-Only Mode: Appointment #{instance.id} created with QR: {instance.qr_code}")

@@ -2,17 +2,19 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Q
+from django.core.paginator import Paginator
+from django.contrib import messages
 import json
 import io
-import uuid
+import base64
 import qrcode
-from datetime import timedelta, date
-from .models import User, Doctor, Patient, Appointment, Procedure, Door, AccessEvent
-from .controller.hik_client import HikClient
-from django.views.decorators.csrf import csrf_exempt
+from datetime import timedelta
+from .models import User, Doctor, Patient, Appointment, Terminal
+from .services import probe_terminal, open_door, fetch_recent_scans, generate_simple_qr_code
 
 def _qr_png(payload: str) -> bytes:
     """Generate QR code PNG image from payload"""
@@ -20,56 +22,6 @@ def _qr_png(payload: str) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
-
-def _provision_to_all_doors(card_no: str, person_name: str, valid_from=None, valid_to=None) -> dict:
-    """
-    Push user+card+rights to every active Door.
-    Returns {'ok': [...], 'fail': [(door_id, err), ...]}
-    """
-    results = {"ok": [], "fail": []}
-    doors_qs = Door.objects.all()
-    # if you have 'active' field, use: Door.objects.filter(active=True)
-    
-    # Format times for Hikvision API
-    begin_time = valid_from.strftime("%Y-%m-%dT%H:%M:%SZ") if valid_from else None
-    end_time = valid_to.strftime("%Y-%m-%dT%H:%M:%SZ") if valid_to else None
-    
-    for door in doors_qs:
-        try:
-            client = HikClient(door.terminal_ip, door.terminal_username, door.terminal_password)
-            client.ping()
-            
-            # Use appointment ID as employee number for uniqueness
-            employee_no = f"TEMP{card_no}"
-            
-            client.create_user(employee_no, person_name, valid_from, valid_to)
-            client.bind_card(employee_no, card_no, valid_from, valid_to)
-            # if Door has room_number/door_no use it; else default 1
-            door_no = getattr(door, "room_number", getattr(door, "door_no", 1))
-            client.grant_door(employee_no, door_no=door_no)
-            results["ok"].append(door.id)
-        except Exception as e:
-            results["fail"].append((door.id, str(e)))
-    return results
-
-def _revoke_from_all_doors(card_no: str) -> dict:
-    """
-    Remove user+card+rights from every Door.
-    Returns {'ok': [...], 'fail': [(door_id, err), ...]}
-    """
-    results = {"ok": [], "fail": []}
-    doors_qs = Door.objects.all()
-    
-    for door in doors_qs:
-        try:
-            client = HikClient(door.terminal_ip, door.terminal_username, door.terminal_password)
-            employee_no = f"TEMP{card_no}"
-            client.delete_user(employee_no)
-            results["ok"].append(door.id)
-        except Exception as e:
-            results["fail"].append((door.id, str(e)))
-    
-    return results
 
 def home_view(request):
     """Home page - redirect to login if not authenticated, otherwise to dashboard"""
@@ -104,101 +56,99 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     """Main dashboard view with statistics"""
-    today = timezone.now().date()
+    # Get period from request (default to 'today')
+    period = request.GET.get('period', 'today')
+    now = timezone.now()
     
-    # Calculate comprehensive statistics
-    today_revenue = Appointment.objects.filter(
-        appointment_date=today,
-        paid=True
-    ).aggregate(total=Sum('procedure__price'))['total'] or 0
+    # Calculate date range based on period
+    if period == 'today':
+        start_date = now.date()
+        end_date = now.date()
+        period_label = 'Today'
+    elif period == 'week':
+        start_date = now.date() - timedelta(days=now.weekday())
+        end_date = start_date + timedelta(days=6)
+        period_label = 'This Week'
+    elif period == 'month':
+        start_date = now.date().replace(day=1)
+        if now.month == 12:
+            end_date = now.date().replace(year=now.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_date = now.date().replace(month=now.month + 1, day=1) - timedelta(days=1)
+        period_label = 'This Month'
+    else:
+        start_date = now.date()
+        end_date = now.date()
+        period_label = 'Today'
     
-    today_receipts = Appointment.objects.filter(
-        appointment_date=today
+    # Calculate comprehensive statistics for the selected period
+    period_revenue = Appointment.objects.filter(
+        created_at__date__range=[start_date, end_date],
+        status='active'
+    ).aggregate(total=Sum('doctor__price'))['total'] or 0
+    
+    period_receipts = Appointment.objects.filter(
+        created_at__date__range=[start_date, end_date]
     ).count()
     
-    scans_24h_allow = Appointment.objects.filter(
-        valid_from__gte=timezone.now() - timedelta(hours=24),
-        status='used'
-    ).count()
-    
-    scans_24h_deny = Appointment.objects.filter(
-        valid_from__gte=timezone.now() - timedelta(hours=24),
-        status='expired'
-    ).count()
-    
-    active_posts = Appointment.objects.filter(
+    active_appointments = Appointment.objects.filter(
         status='active',
         valid_from__lte=timezone.now(),
-        valid_to__gte=timezone.now()
+        valid_till__gte=timezone.now()
     ).count()
     
     active_doctors = Doctor.objects.count()
-    active_procedures = Procedure.objects.count()
     total_patients = Patient.objects.count()
-    total_locations = 0  # Doors are now independent, not tied to procedures
     
-    # Get latest appointments
+    # Get latest appointments for the selected period
     latest_appointments = Appointment.objects.select_related(
-        'patient', 'doctor', 'procedure'
+        'patient', 'doctor'
+    ).filter(
+        created_at__date__range=[start_date, end_date]
     ).order_by('-created_at')[:12]
     
     context = {
         'user': request.user,
+        'period': period,
+        'period_label': period_label,
         'statistics': {
-            'today_revenue': today_revenue,
-            'today_receipts': today_receipts,
-            'scans_24h_allow': scans_24h_allow,
-            'scans_24h_deny': scans_24h_deny,
-            'active_posts': active_posts,
+            'period_revenue': period_revenue,
+            'period_receipts': period_receipts,
+            'active_appointments': active_appointments,
             'active_doctors': active_doctors,
-            'active_procedures': active_procedures,
             'total_patients': total_patients,
-            'total_locations': total_locations,
         },
         'latest_appointments': latest_appointments,
     }
     return render(request, 'medical_access/dashboard.html', context)
 
-
-
 @login_required
 def patient_registration_view(request):
-    """Cash register view with statistics and appointment management"""
+    """Patient registration view with appointment management"""
     today = timezone.now().date()
     
     # Calculate statistics
     today_revenue = Appointment.objects.filter(
-        appointment_date=today,
-        paid=True
-    ).aggregate(total=Sum('procedure__price'))['total'] or 0
+        created_at__date=today,
+        status='active'
+    ).aggregate(total=Sum('doctor__price'))['total'] or 0
     
     today_receipts = Appointment.objects.filter(
-        appointment_date=today
-    ).count()
-    
-    today_entrances = Appointment.objects.filter(
-        valid_from__date=today,
-        status='used'
-    ).count()
-    
-    today_exits = Appointment.objects.filter(
-        valid_from__date=today,
-        status='used'
+        created_at__date=today
     ).count()
     
     active_qr_codes = Appointment.objects.filter(
         status='active',
         valid_from__lte=timezone.now(),
-        valid_to__gte=timezone.now()
+        valid_till__gte=timezone.now()
     ).count()
     
     # Get latest appointments
     latest_appointments = Appointment.objects.select_related(
-        'patient', 'doctor', 'procedure'
+        'patient', 'doctor'
     ).order_by('-created_at')[:10]
     
-    # Get procedures and doctors for form
-    procedures = Procedure.objects.all()
+    # Get doctors for form
     doctors = Doctor.objects.all()
     
     context = {
@@ -206,12 +156,9 @@ def patient_registration_view(request):
         'statistics': {
             'today_revenue': today_revenue,
             'today_receipts': today_receipts,
-            'today_entrances': today_entrances,
-            'today_exits': today_exits,
             'active_qr_codes': active_qr_codes,
         },
         'latest_appointments': latest_appointments,
-        'procedures': procedures,
         'doctors': doctors,
     }
     return render(request, 'medical_access/patient_registration.html', context)
@@ -219,40 +166,174 @@ def patient_registration_view(request):
 @login_required
 def doctors_view(request):
     """Doctors list view"""
-    doctors = Doctor.objects.all()
+    doctors = Doctor.objects.all().order_by('last_name', 'first_name')
+    
+    # Pagination
+    paginator = Paginator(doctors, 12)  # Show 12 doctors per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     context = {
         'user': request.user,
-        'doctors': doctors,
+        'doctors': page_obj,
+        'page_obj': page_obj,
     }
     return render(request, 'medical_access/doctors.html', context)
 
-@login_required
-def procedures_view(request):
-    """Procedures list view"""
-    procedures = Procedure.objects.all()
-    doctors = Doctor.objects.all()  # Add doctors for the form
-    context = {
-        'user': request.user,
-        'procedures': procedures,
-        'doctors': doctors,  # Include doctors in context
-    }
-    return render(request, 'medical_access/procedures.html', context)
 
 @login_required
 def patients_view(request):
     """Patients list view"""
-    patients = Patient.objects.all()
+    patients = Patient.objects.all().order_by('last_name', 'first_name')
+    
+    # Pagination
+    paginator = Paginator(patients, 12)  # Show 12 patients per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     context = {
         'user': request.user,
-        'patients': patients,
+        'patients': page_obj,
+        'page_obj': page_obj,
     }
     return render(request, 'medical_access/patients.html', context)
+
+@login_required
+def appointments_view(request):
+    """View for managing appointments (admin and super admin only)"""
+    # Check user role and redirect accordingly
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
+        return redirect('medical_access:dashboard')
+    
+    # User is admin, proceeding to appointments view
+    appointments = Appointment.objects.select_related(
+        'patient', 'doctor'
+    ).order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(appointments, 12)  # Show 12 appointments per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'appointments': page_obj,
+        'page_obj': page_obj,
+        'doctors': Doctor.objects.all(),
+        'patients': Patient.objects.all(),
+    }
+    
+    return render(request, 'medical_access/appointments.html', context)
+
+@login_required
+def terminals_view(request):
+    """View for managing terminals (admin and super admin only)"""
+    # Check user role and redirect accordingly
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
+        return redirect('medical_access:dashboard')
+    
+    # Get all terminals
+    terminals = Terminal.objects.all().order_by('terminal_name')
+    
+    # Pagination
+    paginator = Paginator(terminals, 12)  # Show 12 terminals per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'terminals': page_obj,
+        'page_obj': page_obj,
+        'user': request.user,
+    }
+    
+    return render(request, 'medical_access/terminals.html', context)
+
+@login_required
+def kiosk_view(request):
+    """QR Scanner/Kiosk view for scanning appointment QR codes"""
+    context = {
+        'user': request.user,
+    }
+    return render(request, 'medical_access/kiosk.html', context)
+
+@login_required
+def verify_appointment(request, code):
+    """Verify appointment by QR code or card number"""
+    try:
+        # Try to find appointment by QR code
+        appointment = Appointment.objects.select_related(
+            'patient', 'doctor'
+        ).filter(
+            qr_code=code
+        ).first()
+        
+        if not appointment:
+            return JsonResponse({
+                'success': False,
+                'message': 'Appointment not found with this code'
+            }, status=404)
+        
+        # Check if appointment is valid
+        if not appointment.is_valid:
+            return JsonResponse({
+                'success': False,
+                'message': 'Appointment is no longer valid or has expired'
+            }, status=400)
+        
+        # Mark as used if it's still active
+        if appointment.status == Appointment.Status.ACTIVE:
+            appointment.mark_as_used()
+        
+        return JsonResponse({
+            'success': True,
+            'appointment': {
+                'id': appointment.id,
+                'patient': {
+                    'full_name': appointment.patient.full_name,
+                    'first_name': appointment.patient.first_name,
+                    'last_name': appointment.patient.last_name,
+                },
+                'doctor': {
+                    'full_name': appointment.doctor.full_name if appointment.doctor else None,
+                    'first_name': appointment.doctor.first_name if appointment.doctor else None,
+                    'last_name': appointment.doctor.last_name if appointment.doctor else None,
+                } if appointment.doctor else None,
+                'procedure': {
+                    'title': appointment.doctor.procedure,
+                    'price': str(appointment.doctor.price),
+                },
+                'created_at': appointment.created_at.strftime('%Y-%m-%d %H:%M'),
+                'status': appointment.status,
+                'qr_code': appointment.qr_code,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
+
+@login_required
+def appointment_detail(request, appointment_id):
+    """View appointment details and generate QR if needed"""
+    appointment = get_object_or_404(
+        Appointment.objects.select_related('patient', 'doctor'),
+        id=appointment_id
+    )
+
+    context = {
+        'appointment': appointment,
+        'user': request.user,
+    }
+    return render(request, 'medical_access/appointment_detail.html', context)
+
+# API Views for AJAX
 
 @require_POST
 @login_required
 def create_doctor(request):
-    """Create new doctor - admin only"""
-    if request.user.role != User.Role.ADMIN:
+    """Create new doctor - admin and super admin only"""
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
         return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
     
     try:
@@ -273,66 +354,171 @@ def create_doctor(request):
             if not first_name and not last_name:
                 return JsonResponse({'success': False, 'message': 'First name or last name is required'}, status=400)
         
-        # Create doctor directly
+        procedure = data.get('procedure', 'General Consultation').strip()
+        price = data.get('price', 0.00)
+        
+        # Create doctor with procedure and price
         doctor = Doctor.objects.create(
             first_name=first_name,
-            last_name=last_name
+            last_name=last_name,
+            procedure=procedure,
+            price=price
         )
         
         return JsonResponse({
             'success': True, 
             'message': 'Doctor created successfully',
-            'doctor_id': doctor.id
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
-
-@require_POST
-@login_required
-def create_procedure(request):
-    """Create new procedure - admin only"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
-    
-    try:
-        data = json.loads(request.body)
-        title = data.get('title')
-        price = data.get('price')
-        doctor_ids = data.get('doctors', [])
-        
-        if not title or not price:
-            return JsonResponse({'success': False, 'message': 'Title and price are required'}, status=400)
-        
-        # Create procedure
-        procedure = Procedure.objects.create(
-            title=title,
-            price=price
-        )
-        
-        # Assign doctors if provided
-        if doctor_ids:
-            doctors = Doctor.objects.filter(id__in=doctor_ids)
-            procedure.doctors.set(doctors)
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Procedure "{title}" created successfully',
-            'procedure': {
-                'id': procedure.id,
-                'title': procedure.title,
-                'price': str(procedure.price)
+            'doctor': {
+                'id': doctor.id,
+                'first_name': doctor.first_name,
+                'last_name': doctor.last_name,
+                'procedure': doctor.procedure,
+                'price': str(doctor.price)
             }
         })
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
+
+@require_POST
+@login_required
+def create_appointment(request):
+    """Create new appointment/receipt"""
+    try:
+        data = json.loads(request.body)
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        phone = data.get('phone', '')
+        passport_series = data.get('passport_series', '')
+        passport_number = data.get('passport_number', '')
+        doctor_id = data.get('doctor_id')
+        
+        if not first_name or not last_name or not doctor_id:
+            return JsonResponse({'success': False, 'message': 'First name, last name, and doctor are required'}, status=400)
+        
+        # Get or create patient based on phone number (if provided) or name
+        if phone:
+            # Try to find existing patient by phone
+            try:
+                patient = Patient.objects.get(phone=phone)
+                # Update patient info if name has changed
+                if patient.first_name != first_name or patient.last_name != last_name:
+                    patient.first_name = first_name
+                    patient.last_name = last_name
+                    patient.passport_series = passport_series
+                    patient.passport_number = passport_number
+                    patient.save()
+            except Patient.DoesNotExist:
+                # Create new patient
+                patient = Patient.objects.create(
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=phone,
+                    passport_series=passport_series,
+                    passport_number=passport_number
+                )
+        else:
+            # No phone provided, create new patient with just name
+            patient = Patient.objects.create(
+                first_name=first_name,
+                last_name=last_name,
+                passport_series=passport_series,
+                passport_number=passport_number
+            )
+        
+        doctor = get_object_or_404(Doctor, id=doctor_id)
+        
+        # Create appointment with simple QR code
+        now = timezone.now()
+        valid_till = now + timedelta(hours=24)  # 24 hours validity
+        
+        # Generate simple 12-character QR code
+        qr_code = generate_simple_qr_code()
+        
+        appointment = Appointment.objects.create(
+            patient=patient,
+            doctor=doctor,
+            status='active',
+            valid_from=now,
+            valid_till=valid_till,
+            qr_code=qr_code
+        )
+        
+        return JsonResponse({
+            'success': True, 
+            'message': 'Appointment created successfully',
+            'appointment_id': appointment.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+@login_required
+def create_qr(request, appointment_id):
+    """Create QR code for appointment access with 24h validity"""
+    try:
+        appointment = get_object_or_404(
+            Appointment.objects.select_related('patient'),
+            id=appointment_id
+        )
+        
+        if not appointment.paid:
+            return JsonResponse({"error": "Payment required"}, status=400)
+        
+        # Only check if appointment is active, not if it's in the past
+        if appointment.status != 'active':
+            return JsonResponse({"error": "Appointment is not active"}, status=400)
+
+        # Use existing QR code from appointment
+        qr_code = appointment.qr_code
+
+        # Return QR image
+        response = HttpResponse(_qr_png(qr_code), content_type="image/png")
+        response['Content-Disposition'] = f'attachment; filename="qr_pass_{qr_code}.png"'
+        return response
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@login_required
+def generate_receipt(request, appointment_id):
+    """Generate and display receipt with QR code"""
+    try:
+        appointment = get_object_or_404(
+            Appointment.objects.select_related('patient', 'doctor'),
+            id=appointment_id
+        )
+        
+        # Generate QR code from appointment's qr_code field
+        qr_data = appointment.qr_code or str(appointment.id)
+        img = qrcode.make(qr_data)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        
+        # Convert to base64 for embedding in HTML
+        qr_code_base64 = base64.b64encode(buf.getvalue()).decode()
+        
+        context = {
+            'appointment': appointment,
+            'qr_code_base64': qr_code_base64,
+            'user': request.user,
+        }
+        
+        return render(request, 'medical_access/receipt.html', context)
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+# Additional CRUD operations for doctors, procedures, patients, appointments
+# (Update, Delete, Get operations - keeping them simple)
+
 @require_POST
 @login_required
 def update_doctor(request, doctor_id):
-    """Update doctor - admin only"""
-    if request.user.role != User.Role.ADMIN:
+    """Update doctor - admin and super admin only"""
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
         return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
     
     try:
@@ -351,15 +537,23 @@ def update_doctor(request, doctor_id):
             if data.get('last_name'):
                 doctor.last_name = data.get('last_name').strip()
         
+        # Update procedure and price
+        if data.get('procedure'):
+            doctor.procedure = data.get('procedure').strip()
+        if data.get('price'):
+            doctor.price = data.get('price')
+        
         doctor.save()
         
         return JsonResponse({
             'success': True,
             'message': 'Doctor updated successfully',
             'doctor': {
-                'full_name': doctor.full_name,
+                'id': doctor.id,
                 'first_name': doctor.first_name,
-                'last_name': doctor.last_name
+                'last_name': doctor.last_name,
+                'procedure': doctor.procedure,
+                'price': str(doctor.price)
             }
         })
         
@@ -369,8 +563,8 @@ def update_doctor(request, doctor_id):
 @require_POST
 @login_required
 def delete_doctor(request, doctor_id):
-    """Delete doctor - admin only"""
-    if request.user.role != User.Role.ADMIN:
+    """Delete doctor - admin and super admin only"""
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
         return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
     
     try:
@@ -395,268 +589,27 @@ def delete_doctor(request, doctor_id):
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
-@require_POST
 @login_required
-def create_appointment(request):
-    """Create new appointment/receipt"""
+def get_doctor(request, doctor_id):
+    """Get doctor details for editing"""
     try:
-        data = json.loads(request.body)
-        first_name = data.get('first_name')
-        last_name = data.get('last_name')
-        phone = data.get('phone', '')
-        procedure_id = data.get('procedure_id')
-        doctor_id = data.get('doctor_id')
-        amount = data.get('amount')
-        
-        if not first_name or not last_name or not procedure_id:
-            return JsonResponse({'success': False, 'message': 'First name, last name, and procedure are required'}, status=400)
-        
-        # Get or create patient based on phone number (if provided) or name
-        if phone:
-            # Try to find existing patient by phone
-            try:
-                patient = Patient.objects.get(phone=phone)
-                # Update patient info if name has changed
-                if patient.first_name != first_name or patient.last_name != last_name:
-                    patient.first_name = first_name
-                    patient.last_name = last_name
-                    patient.save()
-            except Patient.DoesNotExist:
-                # Create new patient
-                patient = Patient.objects.create(
-                    first_name=first_name,
-                    last_name=last_name,
-                    phone=phone
-                )
-        else:
-            # No phone provided, create new patient with just name
-            patient = Patient.objects.create(
-                first_name=first_name,
-                last_name=last_name
-            )
-        
-        procedure = get_object_or_404(Procedure, id=procedure_id)
-        doctor = None
-        if doctor_id:
-            doctor = get_object_or_404(Doctor, id=doctor_id)
-        
-        # Create appointment with QR code fields
-        now = timezone.now()
-        valid_to = now + timedelta(hours=24)  # 24 hours validity
-        
-        appointment = Appointment.objects.create(
-            patient=patient,
-            doctor=doctor,
-            procedure=procedure,
-            appointment_date=timezone.now().date(),
-            appointment_time=timezone.now().time(),
-            paid=True,  # Default to paid
-            status='active',
-            valid_from=now,
-            valid_to=valid_to
-        )
-        
-        return JsonResponse({
-            'success': True, 
-            'message': 'Appointment created successfully',
-            'appointment_id': appointment.id
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
-
-@require_POST
-@login_required
-def create_qr(request, appointment_id):
-    """Create QR code for appointment access with 24h validity and provision to all doors"""
-    try:
-        appointment = get_object_or_404(
-            Appointment.objects.select_related('patient'),
-            id=appointment_id
-        )
-        
-        if not appointment.paid:
-            return JsonResponse({"error": "Payment required"}, status=400)
-        
-        # Only check if appointment is active, not if it's in the past
-        if appointment.status != 'active':
-            return JsonResponse({"error": "Appointment is not active"}, status=400)
-
-        # Use existing card_no from appointment
-        card_no = appointment.card_no
-        payload = appointment.qr_payload
-
-        # Provision to all doors with validity times (ISAPI hardware integration)
-        person_name = getattr(appointment.patient, "full_name", None) or "Patient"
-        try:
-            provision = _provision_to_all_doors(card_no, person_name, appointment.valid_from, appointment.valid_to)
-            # Card provisioned successfully
-            if provision['fail']:
-                # Some doors failed - this is logged in the provision function
-                pass
-        except Exception as e:
-            # Error provisioning card - this is logged in the provision function
-            pass
-            # Continue anyway - kiosk verification will still work
-
-        # Return QR image
-        response = HttpResponse(_qr_png(payload), content_type="image/png")
-        response['Content-Disposition'] = f'attachment; filename="qr_pass_{card_no}.png"'
-        return response
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-@login_required
-def generate_receipt(request, appointment_id):
-    """Generate and display receipt with QR code"""
-    try:
-        appointment = get_object_or_404(
-            Appointment.objects.select_related('patient', 'doctor', 'procedure'),
-            id=appointment_id
-        )
-        
-        # Generate QR code from appointment's card_no or qr_payload
-        qr_data = appointment.qr_payload or appointment.card_no or str(appointment.id)
-        img = qrcode.make(qr_data)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        
-        # Convert to base64 for embedding in HTML
-        import base64
-        qr_code_base64 = base64.b64encode(buf.getvalue()).decode()
-        
-        context = {
-            'appointment': appointment,
-            'qr_code_base64': qr_code_base64,
-            'user': request.user,
-        }
-        
-        return render(request, 'medical_access/receipt.html', context)
-        
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-@login_required
-def appointment_detail(request, appointment_id):
-    """View appointment details and generate QR if needed"""
-    appointment = get_object_or_404(
-        Appointment.objects.select_related('patient', 'doctor', 'procedure'),
-        id=appointment_id
-    )
-
-    context = {
-        'appointment': appointment,
-        'user': request.user,
-    }
-    return render(request, 'medical_access/appointment_detail.html', context)
-
-@require_POST
-@login_required
-def delete_procedure(request, procedure_id):
-    """Delete procedure - admin only"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
-    
-    try:
-        procedure = get_object_or_404(Procedure, id=procedure_id)
-        procedure_name = procedure.title
-        
-        procedure.delete()
+        doctor = get_object_or_404(Doctor, id=doctor_id)
         
         return JsonResponse({
             'success': True,
-            'message': f'Procedure "{procedure_name}" deleted successfully'
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
-
-@login_required
-def get_procedure(request, procedure_id):
-    """Get procedure details for editing"""
-    try:
-        procedure = get_object_or_404(Procedure, id=procedure_id)
-        
-        return JsonResponse({
-            'success': True,
-            'procedure': {
-                'id': procedure.id,
-                'title': procedure.title,
-                'price': procedure.price,
-                'doctors': [doctor.id for doctor in procedure.doctors.all()]
+            'doctor': {
+                'id': doctor.id,
+                'first_name': doctor.first_name,
+                'last_name': doctor.last_name,
+                'procedure': doctor.procedure,
+                'price': str(doctor.price),
+                'full_name': doctor.full_name
             }
         })
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
-@login_required
-def get_procedure_doctors(request, procedure_id):
-    """Get doctors assigned to a specific procedure for appointment creation"""
-    try:
-        procedure = get_object_or_404(Procedure, id=procedure_id)
-        doctors = procedure.doctors.all()
-        
-        # If no doctors are assigned to this procedure, return all doctors
-        if not doctors.exists():
-            doctors = Doctor.objects.all()
-        
-        return JsonResponse({
-            'success': True,
-            'doctors': [
-                {
-                    'id': doctor.id,
-                    'full_name': doctor.full_name,
-                    'first_name': doctor.first_name,
-                    'last_name': doctor.last_name
-                }
-                for doctor in doctors
-            ]
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
-
-@require_POST
-@login_required
-def update_procedure(request, procedure_id):
-    """Update procedure - admin only"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
-    
-    try:
-        procedure = get_object_or_404(Procedure, id=procedure_id)
-        data = json.loads(request.body)
-        
-        if data.get('title'):
-            procedure.title = data['title']
-        
-        if data.get('price'):
-            procedure.price = data['price']
-
-        procedure.save()
-        
-        # Update doctor assignments
-        if 'doctors' in data:
-            doctor_ids = data['doctors']
-            doctors = Doctor.objects.filter(id__in=doctor_ids)
-            procedure.doctors.set(doctors)
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Procedure updated successfully',
-            'procedure': {
-                'id': procedure.id,
-                'title': procedure.title,
-                'price': procedure.price,
-                'doctors': [doctor.id for doctor in procedure.doctors.all()]
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 @login_required
 def get_patient(request, patient_id):
@@ -670,6 +623,8 @@ def get_patient(request, patient_id):
                 'first_name': patient.first_name,
                 'last_name': patient.last_name,
                 'phone': patient.phone,
+                'passport_series': patient.passport_series,
+                'passport_number': patient.passport_number,
                 'full_name': patient.full_name,
                 'created_at': patient.created_at.isoformat(),
                 'updated_at': patient.updated_at.isoformat()
@@ -687,7 +642,9 @@ def create_patient(request):
             patient = Patient.objects.create(
                 first_name=data.get('first_name', '').strip(),
                 last_name=data.get('last_name', '').strip(),
-                phone=data.get('phone', '').strip() or None
+                phone=data.get('phone', '').strip() or None,
+                passport_series=data.get('passport_series', '').strip() or None,
+                passport_number=data.get('passport_number', '').strip() or None
             )
             return JsonResponse({
                 'success': True,
@@ -697,6 +654,8 @@ def create_patient(request):
                     'first_name': patient.first_name,
                     'last_name': patient.last_name,
                     'phone': patient.phone,
+                    'passport_series': patient.passport_series,
+                    'passport_number': patient.passport_number,
                     'full_name': patient.full_name,
                     'created_at': patient.created_at.strftime('%d/%m/%Y %H:%M')
                 }
@@ -717,6 +676,8 @@ def update_patient(request, patient_id):
             patient.first_name = data.get('first_name', '').strip()
             patient.last_name = data.get('last_name', '').strip()
             patient.phone = data.get('phone', '').strip() or None
+            patient.passport_series = data.get('passport_series', '').strip() or None
+            patient.passport_number = data.get('passport_number', '').strip() or None
             
             patient.save()
             
@@ -728,6 +689,8 @@ def update_patient(request, patient_id):
                     'first_name': patient.first_name,
                     'last_name': patient.last_name,
                     'phone': patient.phone,
+                    'passport_series': patient.passport_series,
+                    'passport_number': patient.passport_number,
                     'full_name': patient.full_name
                 }
             })
@@ -758,103 +721,60 @@ def delete_patient(request, patient_id):
     return JsonResponse({'success': False, 'message': 'Invalid request method'}, status=405)
 
 @login_required
-def appointments_view(request):
-    """View for managing appointments (admin only)"""
-    # Check user role and redirect accordingly
-    if request.user.role != User.Role.ADMIN:
-        return redirect('medical_access:dashboard')
-    
-    # User is admin, proceeding to appointments view
-    appointments = Appointment.objects.select_related(
-        'patient', 'doctor', 'procedure'
-    ).order_by('-appointment_date', '-appointment_time')
-    
-    context = {
-        'appointments': appointments,
-        'doctors': Doctor.objects.all(),
-        'procedures': Procedure.objects.all(),
-        'patients': Patient.objects.all(),
-    }
-    
-    return render(request, 'medical_access/appointments.html', context)
-
-@login_required
-def create_appointment_admin(request):
-    """Create a new appointment from admin panel"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Admin access required'}, status=403)
-    
-    if request.method == 'POST':
-        try:
-            data = request.POST
-            
-            # Get the related objects
-            patient = get_object_or_404(Patient, id=data.get('patient_id'))
-            doctor = get_object_or_404(Doctor, id=data.get('doctor_id'))
-            procedure = get_object_or_404(Procedure, id=data.get('procedure_id'))
-            
-            # Create the appointment
-            appointment = Appointment.objects.create(
-                patient=patient,
-                doctor=doctor,
-                procedure=procedure,
-                appointment_date=data.get('appointment_date'),
-                appointment_time=data.get('appointment_time'),
-                status=data.get('status', 'scheduled'),
-
-                paid=data.get('paid') == 'on'
-            )
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Appointment created successfully',
-                'appointment': {
-                    'id': appointment.id,
-                    'patient_name': appointment.patient.full_name,
-                    'procedure_name': appointment.procedure.title,
-                    'doctor_name': appointment.doctor.full_name,
-                    'date': appointment.appointment_date.strftime('%d/%m/%Y'),
-                    'time': appointment.appointment_time.strftime('%H:%M'),
-                    'status': appointment.get_status_display(),
-                    'paid': 'Paid' if appointment.paid else 'Unpaid'
-                }
-            })
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)}, status=400)
-    
-    return JsonResponse({'success': False, 'message': 'Invalid request method'}, status=405)
-
-@login_required
 def update_appointment(request, appointment_id):
     """Update an existing appointment"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Admin access required'}, status=403)
-    
     if request.method == 'POST':
         try:
             appointment = get_object_or_404(Appointment, id=appointment_id)
             data = request.POST
             
-            # Update the related objects
-            if data.get('patient_id'):
-                appointment.patient = get_object_or_404(Patient, id=data.get('patient_id'))
-            if data.get('doctor_id'):
-                appointment.doctor = get_object_or_404(Doctor, id=data.get('doctor_id'))
-            if data.get('procedure_id'):
-                appointment.procedure = get_object_or_404(Procedure, id=data.get('procedure_id'))
+            # Validate required fields
+            if not data.get('patient_id'):
+                return JsonResponse({'success': False, 'message': 'Patient is required'}, status=400)
+            if not data.get('doctor_id'):
+                return JsonResponse({'success': False, 'message': 'Doctor is required'}, status=400)
             
-            # Update other fields
-            if data.get('appointment_date'):
-                from datetime import datetime
-                appointment.appointment_date = datetime.strptime(data.get('appointment_date'), '%Y-%m-%d').date()
-            if data.get('appointment_time'):
-                from datetime import datetime
-                appointment.appointment_time = datetime.strptime(data.get('appointment_time'), '%H:%M').time()
+            # Check if patient exists
+            try:
+                patient = Patient.objects.get(id=data.get('patient_id'))
+            except Patient.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Patient not found'}, status=400)
+            
+            # Check if doctor exists
+            try:
+                doctor = Doctor.objects.get(id=data.get('doctor_id'))
+            except Doctor.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Doctor not found'}, status=400)
+            
+            # Update appointment fields
+            appointment.patient = patient
+            appointment.doctor = doctor
+            
+            # Update status if provided
             if data.get('status'):
                 appointment.status = data.get('status')
-
-            # Always set paid to True since all appointments are paid by default
-            appointment.paid = True
+            
+            # Update QR code if provided and different
+            new_qr_code = data.get('qr_code', '').strip()
+            if new_qr_code and new_qr_code != appointment.qr_code:
+                # Check if QR code already exists for another appointment
+                if Appointment.objects.filter(qr_code=new_qr_code).exclude(id=appointment_id).exists():
+                    return JsonResponse({'success': False, 'message': 'QR code already exists'}, status=400)
+                appointment.qr_code = new_qr_code
+            
+            # Update validity dates if provided
+            if data.get('valid_from'):
+                from django.utils.dateparse import parse_datetime
+                valid_from = parse_datetime(data.get('valid_from'))
+                if valid_from:
+                    appointment.valid_from = valid_from
+            
+            if data.get('valid_till'):
+                from django.utils.dateparse import parse_datetime
+                valid_till = parse_datetime(data.get('valid_till'))
+                if valid_till:
+                    appointment.valid_till = valid_till
+            
             appointment.save()
             
             return JsonResponse({
@@ -863,11 +783,14 @@ def update_appointment(request, appointment_id):
                 'appointment': {
                     'id': appointment.id,
                     'patient_name': appointment.patient.full_name,
-                    'procedure_name': appointment.procedure.title,
                     'doctor_name': appointment.doctor.full_name,
-                    'date': appointment.appointment_date.strftime('%d/%m/%Y'),
-                    'time': appointment.appointment_time.strftime('%H:%M'),
-                    'status': appointment.get_status_display()
+                    'doctor_procedure': appointment.doctor.procedure,
+                    'doctor_price': float(appointment.doctor.price),
+                    'status': appointment.get_status_display(),
+                    'qr_code': appointment.qr_code,
+                    'created_at': appointment.created_at.strftime('%Y-%m-%d %H:%M'),
+                    'valid_from': appointment.valid_from.strftime('%Y-%m-%d %H:%M') if appointment.valid_from else None,
+                    'valid_till': appointment.valid_till.strftime('%Y-%m-%d %H:%M') if appointment.valid_till else None,
                 }
             })
         except Exception as e:
@@ -877,154 +800,301 @@ def update_appointment(request, appointment_id):
 
 @login_required
 def delete_appointment(request, appointment_id):
-    """Delete an appointment and all related data"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Admin access required'}, status=403)
+    """Delete an appointment - admin and super admin only"""
+    # Check user role and redirect accordingly
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
+        return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
     
     if request.method == 'POST':
         try:
             appointment = get_object_or_404(Appointment, id=appointment_id)
             
-            # Get appointment details for logging before deletion
-            appointment_info = f"{appointment.patient.full_name} - {appointment.procedure.title}"
+            # Get patient info before deletion for logging
             patient = appointment.patient
+            patient_name = patient.full_name
             
-            # Handle all related data before deleting appointment
-            from medical_access.models import AccessEvent
-            
-            # 1. Set appointment to null in AccessEvent records (preserve audit data)
-            AccessEvent.objects.filter(appointment=appointment).update(appointment=None)
-            
-            # 2. Delete the appointment (this will also delete QR code data as it's part of the appointment)
+            # Delete the appointment (patient will be preserved due to DO_NOTHING)
             appointment.delete()
             
-            # 3. Check if patient has any other appointments, if not, delete the patient
-            remaining_appointments = Appointment.objects.filter(patient=patient).count()
-            if remaining_appointments == 0:
-                patient.delete()
-                return JsonResponse({
-                    'success': True, 
-                    'message': f'Appointment "{appointment_info}" and patient deleted successfully'
-                })
-            else:
-                return JsonResponse({
-                    'success': True, 
-                    'message': f'Appointment "{appointment_info}" deleted successfully (patient has other appointments)'
-                })
-                
+            return JsonResponse({
+                'success': True, 
+                'message': f'Appointment deleted successfully. Patient "{patient_name}" record is preserved.'
+            })
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)}, status=400)
     
     return JsonResponse({'success': False, 'message': 'Invalid request method'}, status=405)
 
+# REMOVED: Terminal API Views - Redundant with admin actions
+
+# Admin button views
 @login_required
-def revoke_pass(request, appointment_id):
-    """Manually revoke an appointment from all doors"""
-    if request.user.role != User.Role.ADMIN:
-        return JsonResponse({'success': False, 'message': 'Admin access required'}, status=403)
+def admin_terminal_health(request, pk: int):
+    """Admin view for terminal health check"""
+    t = get_object_or_404(Terminal, pk=pk)
+    res = probe_terminal(t)
     
-    try:
-        appointment = get_object_or_404(Appointment, id=appointment_id)
-        
-        # Check if appointment is active
-        if appointment.status != 'active' or not appointment.card_no:
-            return JsonResponse({'success': False, 'message': 'No active appointment found'}, status=404)
-        
-        # Revoke from all doors
-        revoke_results = _revoke_from_all_doors(appointment.card_no)
-        
-        # Mark as revoked
-        appointment.status = 'revoked'
-        appointment.used_at = timezone.now()
-        appointment.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Appointment {appointment.card_no} revoked successfully',
-            'revoke_results': revoke_results
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    if res.get("ok"):
+        messages.success(request, f'Terminal "{t.terminal_name}" is reachable!')
+    else:
+        messages.error(request, f'Terminal "{t.terminal_name}" is not reachable: {res.get("error", "Unknown error")}')
+    
+    return redirect('admin:medical_access_terminal_changelist')
 
-# Import QR API functions
-from .qr_api import qr_verify_api, kiosk_view, remote_open_door_api
+@login_required
+def admin_terminal_open(request, pk: int):
+    """Admin view for opening terminal door"""
+    t = get_object_or_404(Terminal, pk=pk)
+    res = open_door(t, door_no=1)
+    
+    if res.get("ok"):
+        messages.success(request, f'Door open command sent to "{t.terminal_name}"!')
+    else:
+        messages.error(request, f'Failed to open door on "{t.terminal_name}": {res.get("error", "Unknown error")}')
+    
+    return redirect('admin:medical_access_terminal_changelist')
 
+# Manual repush API for appointments
+def to_iso(dt):
+    """ISO format the device accepts, e.g. "2025-09-06T07:00:00" """
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
+# REMOVED: repush_qr_to_all_terminals - Not needed for Remote-Only Mode
+
+# QR validation and door control for terminals
 @csrf_exempt
 @require_POST
-def provision_appointment_to_terminals(request, appointment_id):
+def validate_qr_and_open_door(request, terminal_id: int):
+    """Validate QR code and open door if valid appointment"""
+    terminal = get_object_or_404(Terminal, pk=terminal_id)
+    data = json.loads(request.body)
+    qr_code = data.get('qr_code') or data.get('qr_payload')  # Support both field names for backward compatibility
+    
+    if not qr_code:
+        return JsonResponse({"ok": False, "error": "QR code required"}, status=400)
+    
+    try:
+        # Find appointment with this QR code (active, enter, or leave status)
+        now = timezone.now()
+        appointment = Appointment.objects.filter(
+            qr_code=qr_code,
+            status__in=['active', 'enter', 'leave'],
+            valid_from__lte=now,
+            valid_till__gte=now
+        ).first()
+        
+        if not appointment:
+            return JsonResponse({
+                "ok": False, 
+                "error": "Invalid or expired QR code",
+                "appointment": None
+            })
+        
+        # Determine if this is entry or exit based on terminal mode and appointment status
+        terminal_mode = terminal.mode.lower()
+        can_proceed = False
+        new_status = appointment.status
+        
+        if terminal_mode == "entry":
+            if appointment.status == 'active':
+                can_proceed = True
+                new_status = 'enter'
+        elif terminal_mode == "exit":
+            if appointment.status == 'enter':
+                can_proceed = True
+                new_status = 'leave'
+        else:  # 'both' mode
+            if appointment.status == 'active':
+                can_proceed = True
+                new_status = 'enter'
+            elif appointment.status == 'enter':
+                can_proceed = True
+                new_status = 'leave'
+        
+        if not can_proceed:
+            return JsonResponse({
+                "ok": False, 
+                "error": f"Access denied: Invalid status transition from {appointment.status} for {terminal_mode} mode",
+                "appointment": {
+                    "id": appointment.id,
+                    "patient": appointment.patient.full_name,
+                    "doctor": appointment.doctor.full_name,
+                    "status": appointment.status
+                }
+            })
+        
+        # Open door
+        result = open_door(terminal, door_no=1)
+        if result.get('ok'):
+            # Update appointment status
+            appointment.status = new_status
+            if new_status == 'enter':
+                appointment.used_at = now
+            appointment.save()
+            
+            return JsonResponse({
+                "ok": True,
+                "message": "Door opened successfully",
+                "appointment": {
+                    "id": appointment.id,
+                    "patient": appointment.patient.full_name,
+                    "doctor": appointment.doctor.full_name,
+                    "status": appointment.status
+                }
+            })
+        else:
+            return JsonResponse({
+                "ok": False,
+                "error": f"Failed to open door: {result.get('error')}",
+                "appointment": {
+                    "id": appointment.id,
+                    "patient": appointment.patient.full_name,
+                    "doctor": appointment.doctor.full_name
+                }
+            })
+            
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+# Simple scan event logging API (console only)
+@csrf_exempt
+@require_POST
+def log_scan_event(request):
     """
-    Simple API to provision an appointment to all terminals.
-    POST /medical_access/appointment/<id>/provision/
+    Simple API endpoint to receive QR/card scan events from terminals.
+    Just logs to console and returns terminal mode.
+    Expected JSON payload:
+    {
+        "terminal_ip": "192.168.100.60",
+        "qr_code": "99536641",
+        "scan_type": "qr"  // optional: "qr", "card", or "unknown"
+    }
     """
     try:
-        appointment = Appointment.objects.get(id=appointment_id)
+        data = json.loads(request.body)
+        terminal_ip = data.get('terminal_ip')
+        qr_code = data.get('qr_code') or data.get('qr_payload')  # Support both field names
+        scan_type = data.get('scan_type', 'unknown')
         
-        if not appointment.paid:
+        if not terminal_ip or not qr_code:
             return JsonResponse({
-                'success': False,
-                'error': 'Appointment must be paid before provisioning'
+                "ok": False, 
+                "error": "Missing required fields: terminal_ip, qr_code"
             }, status=400)
         
-        # Check if appointment has QR code fields
-        if not appointment.card_no:
-            return JsonResponse({
-                'success': False,
-                'error': 'No QR code found for this appointment'
-            }, status=400)
+        # Get terminal mode
+        terminal = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
+        terminal_mode = terminal.mode if terminal else "unknown"
         
-        if not appointment.card_no.isdigit():
-            return JsonResponse({
-                'success': False,
-                'error': f'Invalid card number: {appointment.card_no} (must be numeric)'
-            }, status=400)
+        # Determine scan type if not provided
+        if scan_type == 'unknown':
+            if qr_code.isdigit():
+                scan_type = 'card'
+            else:
+                scan_type = 'qr'
         
-        # Provision to all terminals
-        results = []
-        for door in Door.objects.all():
-            try:
-                client = HikClient(door.terminal_ip, door.terminal_username, door.terminal_password)
-                
-                # Create user
-                employee_no = f"APT{appointment.id}"
-                client.create_user(employee_no, appointment.patient.full_name, appointment.valid_from, appointment.valid_to)
-                
-                # Bind card
-                client.bind_card(employee_no, appointment.card_no, appointment.valid_from, appointment.valid_to)
-                
-                # Skip door authorization (not supported)
-                client.grant_door(employee_no, door_no=1, time_section_no=1)
-                
-                results.append({
-                    'door': door.name,
-                    'status': 'success',
-                    'user': employee_no,
-                    'card': temp_pass.card_no
-                })
-                
-            except Exception as e:
-                results.append({
-                    'door': door.name,
-                    'status': 'failed',
-                    'error': str(e)
-                })
+        # Log scan event (using Django logging instead of print)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Scan event: Terminal {terminal_ip} ({terminal_mode}) - QR: {qr_code} - Type: {scan_type}")
         
-        success_count = len([r for r in results if r['status'] == 'success'])
+        # Check if it's a valid appointment (optional validation)
+        is_valid = False
+        if scan_type in ['qr', 'card']:
+            active_appointment = Appointment.objects.filter(
+                qr_code=qr_code,
+                status__in=['active', 'enter', 'leave'],
+                valid_from__lte=timezone.now(),
+                valid_till__gte=timezone.now()
+            ).first()
+            
+            if active_appointment:
+                is_valid = True
         
         return JsonResponse({
-            'success': True,
-            'message': f'Provisioned to {success_count}/{len(results)} terminals',
-            'results': results
+            "ok": True,
+            "terminal_ip": terminal_ip,
+            "terminal_mode": terminal_mode,
+            "qr_code": qr_code,
+            "scan_type": scan_type,
+            "is_valid": is_valid,
+            "timestamp": timezone.now().isoformat()
         })
-        
-    except Appointment.DoesNotExist:
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "ok": False, 
+            "error": "Invalid JSON payload"
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            "ok": False, 
+            "error": str(e)
+        }, status=500)
+
+# Get terminal mode API
+@require_GET
+def get_terminal_mode_api(request, terminal_ip: str):
+    """Get the current mode of a terminal"""
+    terminal = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
+    mode = terminal.mode if terminal else "unknown"
+    
+    return JsonResponse({
+        "ok": True,
+        "terminal_ip": terminal_ip,
+        "mode": mode
+    })
+
+# Terminal door control API
+@require_POST
+@login_required
+def terminal_open_door_api(request, terminal_id):
+    """Open door on a specific terminal"""
+    # Check user permissions
+    if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
         return JsonResponse({
             'success': False,
-            'error': 'Appointment not found'
-        }, status=404)
+            'message': 'Permission denied'
+        }, status=403)
+    
+    try:
+        terminal = get_object_or_404(Terminal, id=terminal_id)
+        
+        # Use the open_door service function
+        result = open_door(terminal, door_no=1)
+        
+        if result.get('ok'):
+            return JsonResponse({
+                'success': True,
+                'message': f'Door opened successfully on {terminal.terminal_name}'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'Failed to open door: {result.get("error", "Unknown error")}'
+            }, status=500)
+            
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'message': f'Error opening door: {str(e)}'
         }, status=500)
+
+# Get recent scans from terminal
+@require_GET
+def last_scans(request, pk: int):
+    """Get recent access events from a terminal"""
+    term = get_object_or_404(Terminal, pk=pk)
+    secs = int(request.GET.get("seconds", "120"))
+    res = fetch_recent_scans(term, secs)
+    
+    # Add terminal metadata to response
+    res["terminal"] = {
+        "id": term.id,
+        "name": term.terminal_name,
+        "ip": term.terminal_ip,
+        "mode": term.mode,
+    }
+    
+    status = 200 if res.get("ok") else 502
+    return JsonResponse(res, status=status, json_dumps_params={"ensure_ascii": False})

@@ -1,110 +1,289 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt #{{ appointment.card_no }}</title>
+    <title>Qabul №{{ appointment.card_number|default:appointment.id }}</title>
     <style>
         @media print {
-            body { margin: 0; }
+            body { 
+                margin: 0; 
+                padding: 0;
+                background: white;
+            }
             .no-print { display: none !important; }
-            .receipt { box-shadow: none; border: none; }
+            .receipt { 
+                box-shadow: none; 
+                border: none;
+                margin: 0;
+                padding: 10px;
+            }
+            .receipt-container {
+                max-width: none;
+                margin: 0;
+            }
         }
         
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
+            font-size: 12px;
+        }
+        
+        .receipt-container {
+            max-width: 300px;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
         
         .receipt {
-            max-width: 400px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            border-radius: 8px;
+            width: 100%;
         }
         
-        .clinic-header {
+        /* Header Section */
+        .receipt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
+        
+        .receipt-date {
+            color: #666;
+        }
+        
+        .receipt-title {
             text-align: center;
-            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 11px;
+            color: #333;
         }
         
         .clinic-name {
-            font-size: 24px;
+            text-align: center;
+            font-size: 18px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin: 10px 0 5px 0;
+            color: #000;
         }
         
-        .clinic-address {
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 4px;
+        .app-download {
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 15px;
         }
         
-        .clinic-phone {
-            font-size: 14px;
-            color: #333;
-        }
-        
-        .divider {
-            border-top: 2px dashed #ccc;
+        /* QR Code Section */
+        .qr-section {
+            text-align: center;
             margin: 15px 0;
         }
         
-        .receipt-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        
-        .receipt-row .label {
-            font-weight: bold;
-        }
-        
-        .receipt-row .value {
-            text-align: right;
-        }
-        
-        .qr-section {
-            text-align: center;
-            margin: 20px 0;
-        }
-        
-        .qr-title {
-            font-size: 14px;
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
         .qr-code {
-            margin: 20px auto;
+            margin: 10px auto;
             text-align: center;
         }
         
         .qr-code img {
-            max-width: 200px;
-            height: auto;
+            width: 120px;
+            height: 120px;
+            border: 1px solid #ddd;
         }
         
-        .token {
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
-            word-break: break-all;
+        /* Information Section */
+        .info-section {
+            margin: 15px 0;
         }
         
-        .thank-you {
-            text-align: center;
-            font-size: 16px;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        
+        .info-label {
+            font-weight: normal;
+            color: #333;
+            min-width: 80px;
+        }
+        
+        .info-value {
+            text-align: right;
+            color: #000;
+            font-weight: 500;
+            flex: 1;
+            margin-left: 10px;
+        }
+        
+        .institution-name {
+            font-size: 10px;
+            line-height: 1.2;
+        }
+        
+        .patient-name {
             font-weight: bold;
-            margin: 20px 0;
+            font-size: 11px;
+        }
+        
+        .card-number {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #000;
+        }
+        
+        /* Services Section */
+        .services-header {
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            padding: 5px 0;
+            margin: 10px 0;
+        }
+        
+        .services-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 10px;
+        }
+        
+        .service-name {
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .service-price {
+            font-weight: bold;
+            color: #000;
+        }
+        
+        .dotted-line {
+            border-bottom: 1px dotted #000;
+            margin: 5px 0;
+        }
+        
+        /* Doctor Section */
+        .doctor-section {
+            margin: 10px 0;
+        }
+        
+        .doctor-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 10px;
+        }
+        
+        .doctor-label {
+            font-weight: normal;
             color: #333;
         }
         
+        .doctor-value {
+            color: #000;
+            font-weight: 500;
+        }
+        
+        /* Payment Section */
+        .payment-section {
+            border-top: 1px solid #000;
+            margin: 15px 0;
+            padding-top: 10px;
+        }
+        
+        .total-payment {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .payment-details {
+            margin: 10px 0;
+        }
+        
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 10px;
+        }
+        
+        .stamp-area {
+            position: relative;
+            margin: 15px 0;
+            min-height: 60px;
+        }
+        
+        .stamp {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 80px;
+            height: 80px;
+            border: 2px solid #0066cc;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            text-align: center;
+            color: #0066cc;
+            font-weight: bold;
+            line-height: 1.1;
+            background: rgba(0, 102, 204, 0.05);
+        }
+        
+        .stamp-text {
+            font-size: 7px;
+            margin-bottom: 2px;
+        }
+        
+        .stamp-number {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        /* Footer */
+        .receipt-footer {
+            margin-top: 20px;
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .footer-url {
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        
+        .page-info {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .scanner-info {
+            font-size: 8px;
+            color: #999;
+            margin-top: 5px;
+        }
+        
+        /* Action Buttons */
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -113,159 +292,210 @@
         }
         
         .action-btn {
-            padding: 10px 20px;
-            border: 2px solid #ccc;
+            padding: 8px 16px;
+            border: 1px solid #ccc;
             background: white;
             color: #333;
             text-decoration: none;
-            border-radius: 6px;
-            font-size: 14px;
+            border-radius: 4px;
+            font-size: 12px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         
         .action-btn:hover {
-            border-color: #667eea;
-            color: #667eea;
+            border-color: #0066cc;
+            color: #0066cc;
         }
         
         .action-btn.primary {
-            border-color: #667eea;
-            color: #667eea;
-            text-decoration: underline;
+            background: #0066cc;
+            color: white;
+            border-color: #0066cc;
         }
         
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        
-        .status-issued {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-confirmed {
-            background: #cce5ff;
-            color: #004085;
-        }
-        
-        .status-completed {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-        
-        .amount {
-            font-size: 18px;
-            font-weight: bold;
-            color: #28a745;
-        }
-        
-        .validity {
-            font-size: 14px;
-            color: #dc3545;
-            font-weight: bold;
+        .action-btn.primary:hover {
+            background: #0052a3;
         }
     </style>
 </head>
 <body>
-    <div class="receipt">
-        <!-- Clinic Header -->
-        <div class="clinic-header">
-            <div class="clinic-name">Orlean Clinic</div>
-            <div class="clinic-address">г. Ташкент, ул. Чиланзарская, 1</div>
-            <div class="clinic-phone">+998 (71) 123-45-67</div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Receipt Details -->
-        <div class="receipt-row">
-            <span class="label">Квитанция №</span>
-            <span class="value">{{ appointment.card_no }}</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Дата</span>
-            <span class="value">{{ appointment.created_at|date:"Y-m-d H:i:s" }}</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Статус</span>
-            <span class="value">
-                <span class="status-badge status-{{ appointment.status }}">
-                    {% if appointment.status == 'scheduled' %}issued{% elif appointment.status == 'confirmed' %}confirmed{% else %}completed{% endif %}
-                </span>
-            </span>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Patient and Procedure Details -->
-        <div class="receipt-row">
-            <span class="label">Пациент</span>
-            <span class="value">{{ appointment.patient.full_name }}</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Телефон</span>
-            <span class="value">{{ appointment.patient.phone|default:"—" }}</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Процедура</span>
-            <span class="value">{{ appointment.procedure.title }}</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Врач</span>
-            <span class="value">{{ appointment.doctor.full_name }} — {{ appointment.procedure.title }}</span>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Financial and Validity -->
-        <div class="receipt-row">
-            <span class="label">Сумма</span>
-            <span class="value amount">{{ appointment.procedure.price }} сум</span>
-        </div>
-        <div class="receipt-row">
-            <span class="label">Действителен</span>
-            <span class="value validity">До конца дня</span>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <!-- QR Code Section -->
-        <div class="qr-section">
-            <div class="qr-title">Универсальный QR — для входа и выхода</div>
-            <div class="qr-code">
-                <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code">
+    <div class="receipt-container">
+        <div class="receipt">
+            <!-- Header -->
+            <div class="receipt-header">
+                <div class="receipt-date">{{ appointment.created_at|date:"d.m.Y, H i" }}</div>
+                <div class="receipt-title">Qabullar taqvimi</div>
             </div>
-            <div class="token">
-                <strong>Токен:</strong><br>
-                {{ appointment.qr_payload }}
+            
+            <!-- Clinic Name -->
+            <div class="clinic-name">DMED</div>
+            <div class="app-download">Ilovani yuklab oling</div>
+            
+            <!-- QR Code -->
+            <div class="qr-section">
+                <div class="qr-code">
+                    <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code">
+                </div>
+            </div>
+            
+            <!-- Information Section -->
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="info-label">Muassasa:</span>
+                    <span class="info-value institution-name">Samarqand viloyat ko'p tarmoqli tibbiyot markazi</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Sana:</span>
+                    <span class="info-value">{{ appointment.created_at|date:"d.m.Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bemor:</span>
+                    <span class="info-value patient-name">{{ appointment.patient.full_name|upper }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Tibbiy karta raqami:</span>
+                    <span class="info-value card-number">{{ appointment.card_number|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Tug'ilgan sana:</span>
+                    <span class="info-value">{{ appointment.patient.date_of_birth|date:"d.m.Y"|default:"N/A" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Hisob-faktura:</span>
+                    <span class="info-value">#{{ appointment.id|stringformat:"07d" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Manba:</span>
+                    <span class="info-value">Ambulatoriya</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Vaqt:</span>
+                    <span class="info-value">{{ appointment.created_at|time:"H:i" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Yozib oldi:</span>
+                    <span class="info-value">{{ user.get_full_name|default:"" }}</span>
+                </div>
+            </div>
+            
+            <!-- Services Section -->
+            <div class="services-header">
+                <div class="services-row">
+                    <span>Xizmatlar</span>
+                    <span>Narxi</span>
+                </div>
+            </div>
+            
+            <div class="service-item">
+                <span class="service-name">{{ appointment.doctor.procedure }}</span>
+                <span class="service-price">{{ appointment.doctor.price|floatformat:0 }} so'm</span>
+            </div>
+            
+            <div class="dotted-line"></div>
+            
+            <!-- Doctor Section -->
+            <div class="doctor-section">
+                <div class="doctor-row">
+                    <span class="doctor-label">Shifokor:</span>
+                    <span class="doctor-value">{{ appointment.doctor.full_name|upper }}</span>
+                </div>
+                <div class="doctor-row">
+                    <span class="doctor-label">Xona:</span>
+                    <span class="doctor-value"></span>
+                </div>
+                <div class="doctor-row">
+                    <span class="doctor-label">Qabul:</span>
+                    <span class="doctor-value"></span>
+                </div>
+            </div>
+            
+            <!-- Additional Services (Empty) -->
+            <div class="services-header">
+                <div class="services-row">
+                    <span>Xizmatlar</span>
+                    <span>Narxi</span>
+                </div>
+            </div>
+            
+            <div class="service-item">
+                <span class="service-name">Ma'lumot topilmadi</span>
+                <span class="service-price"></span>
+            </div>
+            
+            <div class="doctor-row">
+                <span class="doctor-label">Shifokor:</span>
+                <span class="doctor-value"></span>
+            </div>
+            <div class="doctor-row">
+                <span class="doctor-label">Xona:</span>
+                <span class="doctor-value"></span>
+            </div>
+            <div class="doctor-row">
+                <span class="doctor-label">Qabul:</span>
+                <span class="doctor-value"></span>
+            </div>
+            
+            <!-- Payment Section -->
+            <div class="payment-section">
+                <div class="total-payment">
+                    <span>Umumiy to'lov:</span>
+                    <span>{{ appointment.doctor.price|floatformat:0 }} so'm</span>
+                </div>
+                
+                <div class="stamp-area">
+                    <div class="payment-row">
+                        <span>To'lovni qabul qildi:</span>
+                        <span></span>
+                    </div>
+                    <div class="payment-row">
+                        <span>To'langan (Uzum):</span>
+                        <span>{{ appointment.doctor.price|floatformat:0 }} so'm</span>
+                    </div>
+                    <div class="payment-row">
+                        <span>To'langan:</span>
+                        <span>{{ appointment.doctor.price|floatformat:0 }} so'm</span>
+                    </div>
+                    <div class="payment-row">
+                        <span>Depozit qoldig'i:</span>
+                        <span>0 so'm</span>
+                    </div>
+                    <div class="payment-row">
+                        <span>To'lash qoladi:</span>
+                        <span>0 so'm</span>
+                    </div>
+                    
+                    <div class="stamp">
+                        <div class="stamp-text">SAMARCAND VILOYAT<br>KO'P TARMOQLI<br>TIBBIYOT MARKAZI</div>
+                        <div class="stamp-number">2</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="receipt-footer">
+                <div class="footer-url">https://mis.dmed.uz/appointments/{{ appointment.id }}</div>
+                <div class="page-info">
+                    <span></span>
+                    <span>1/1</span>
+                </div>
+                <div class="scanner-info">Scanned with CamScanner</div>
             </div>
         </div>
-        
-        <div class="divider"></div>
-        
-        <!-- Footer -->
-        <div class="thank-you">Спасибо за визит!</div>
         
         <!-- Action Buttons (Hidden on print) -->
         <div class="action-buttons no-print">
-            <button class="action-btn" onclick="window.print()">Печать</button>
-            <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="action-btn primary">Полная квитанция</a>
-            <a href="{% url 'medical_access:patient_registration' %}" class="action-btn primary">К кассе</a>
+            <button class="action-btn" onclick="window.print()">Print</button>
+            <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="action-btn primary">Full Details</a>
+            <a href="{% url 'medical_access:patient_registration' %}" class="action-btn primary">Back to Registration</a>
         </div>
     </div>
     
     <script>
-        // Auto-print functionality
-        window.onload = function() {
-            // Auto-print after 1 second (optional)
-            // setTimeout(() => window.print(), 1000);
-        };
+        // Auto-print functionality (optional)
+        // window.onload = function() {
+        //     setTimeout(() => window.print(), 1000);
+        // };
     </script>
 </body>
 </html>
-

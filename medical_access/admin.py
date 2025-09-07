@@ -1,13 +1,48 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.db import transaction
-from django.utils import timezone
-from datetime import timedelta
-import logging
-from .models import User, Doctor, Patient, Procedure, Door, Appointment, AccessEvent
-from .controller.hik_client import HikClient
+from django.contrib.auth.views import redirect_to_login
+from django.urls import reverse
+from django.utils.html import format_html
+from .models import User, Doctor, Patient, Appointment, Terminal
+from .services import probe_terminal, open_door
 
-log = logging.getLogger("medical_access")
+# Custom Admin Site with Role-based Access
+class MedicalAccessAdminSite(admin.AdminSite):
+    site_header = "Medical Access System - Super Admin"
+    site_title = "Medical Access Admin"
+    index_title = "Super Admin Dashboard"
+    
+    def has_permission(self, request):
+        """
+        Allow super admin users or Django superusers to access the Django admin
+        """
+        return (
+            request.user.is_authenticated and 
+            request.user.is_active and 
+            (
+                request.user.is_superuser or  # Django superuser
+                (hasattr(request.user, 'role') and request.user.role == 'super_admin')  # Custom super admin
+            )
+        )
+    
+    def login(self, request, extra_context=None):
+        """
+        Redirect to custom login if user doesn't have super admin role
+        """
+        if not self.has_permission(request):
+            return redirect_to_login(request.get_full_path(), reverse('medical_access:login'))
+        return super().login(request, extra_context)
+    
+    def index(self, request, extra_context=None):
+        """
+        Redirect to custom login if user doesn't have super admin role
+        """
+        if not self.has_permission(request):
+            return redirect_to_login(request.get_full_path(), reverse('medical_access:login'))
+        return super().index(request, extra_context)
+
+# Create custom admin site instance
+medical_admin_site = MedicalAccessAdminSite(name='medical_admin')
 
 # Custom User Admin
 class CustomUserAdmin(UserAdmin):
@@ -25,17 +60,19 @@ class CustomUserAdmin(UserAdmin):
     )
 
 # Doctor Admin
-@admin.register(Doctor)
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'first_name', 'last_name', 'created_at')
+    list_display = ('full_name', 'first_name', 'last_name', 'procedure', 'price', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('first_name', 'last_name')
+    search_fields = ('first_name', 'last_name', 'procedure')
     ordering = ('last_name', 'first_name')
     readonly_fields = ('created_at', 'updated_at')
     
     fieldsets = (
         ('Personal Information', {
             'fields': ('first_name', 'last_name')
+        }),
+        ('Medical Information', {
+            'fields': ('procedure', 'price')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -44,11 +81,10 @@ class DoctorAdmin(admin.ModelAdmin):
     )
 
 # Patient Admin
-@admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'phone', 'created_at')
+    list_display = ('full_name', 'passport_series', 'passport_number', 'phone', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('first_name', 'last_name', 'phone')
+    search_fields = ('first_name', 'last_name', 'phone', 'passport_series', 'passport_number')
     ordering = ('last_name', 'first_name')
     readonly_fields = ('created_at', 'updated_at')
     
@@ -56,49 +92,8 @@ class PatientAdmin(admin.ModelAdmin):
         ('Personal Information', {
             'fields': ('first_name', 'last_name', 'phone')
         }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-
-# Procedure Admin
-@admin.register(Procedure)
-class ProcedureAdmin(admin.ModelAdmin):
-    list_display = ('title', 'price', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('title',)
-    ordering = ('title',)
-    readonly_fields = ('created_at', 'updated_at')
-    
-    fieldsets = (
-        ('Procedure Details', {
-            'fields': ('title', 'price')
-        }),
-        ('Medical Staff', {
-            'fields': ('doctors',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-
-# Door Admin
-@admin.register(Door)
-class DoorAdmin(admin.ModelAdmin):
-    list_display = ('name', 'room_number', 'terminal_ip', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('name', 'room_number', 'terminal_ip')
-    ordering = ('name',)
-    readonly_fields = ('created_at', 'updated_at')
-    
-    fieldsets = (
-        ('Door Information', {
-            'fields': ('name', 'room_number')
-        }),
-        ('Terminal Configuration', {
-            'fields': ('terminal_ip', 'terminal_username', 'terminal_password')
+        ('Passport Information', {
+            'fields': ('passport_series', 'passport_number')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -107,24 +102,21 @@ class DoorAdmin(admin.ModelAdmin):
     )
 
 # Appointment Admin
-@admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'doctor', 'procedure', 'appointment_date', 'appointment_time', 'status', 'paid', 'card_no', 'created_at')
-    list_filter = ('status', 'paid', 'created_at')
-    search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name', 'procedure__title', 'card_no')
-    ordering = ('-appointment_date', '-appointment_time')
-    readonly_fields = ('card_no', 'qr_payload', 'created_at', 'updated_at')
-    date_hierarchy = 'appointment_date'
+    list_display = ('patient', 'doctor', 'status', 'qr_code', 'valid_from', 'valid_till', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name', 'qr_code')
+    ordering = ('-created_at',)
+    readonly_fields = ('qr_code', 'used_at', 'created_at', 'updated_at')
+    date_hierarchy = 'created_at'
+    # actions = []  # No card management actions needed for Remote-Only Mode
     
     fieldsets = (
         ('Appointment Details', {
-            'fields': ('patient', 'doctor', 'procedure', 'appointment_date', 'appointment_time')
-        }),
-        ('Status & Payment', {
-            'fields': ('status', 'paid')
+            'fields': ('patient', 'doctor', 'status')
         }),
         ('QR Code & Access', {
-            'fields': ('card_no', 'qr_payload', 'valid_from', 'valid_to', 'used_at')
+            'fields': ('qr_code', 'valid_from', 'valid_till', 'used_at')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -132,60 +124,78 @@ class AppointmentAdmin(admin.ModelAdmin):
         }),
     )
 
-    def save_model(self, request, obj, form, change):
-        old_paid = False
-        if obj.pk:
-            old_paid = Appointment.objects.filter(pk=obj.pk).values_list("paid", flat=True).first() or False
-        super().save_model(request, obj, form, change)  # ✅ ensures post_save fires
+# Admin actions for Terminal
+@admin.action(description="Test connection (ISAPI)")
+def admin_test_connection(modeladmin, request, queryset):
+    ok, fail = 0, 0
+    for t in queryset:
+        res = probe_terminal(t)
+        ok += 1 if res.get("ok") else 0
+        fail += 0 if res.get("ok") else 1
+    modeladmin.message_user(request, f"Probe done: OK={ok}, Failed={fail}")
 
-        # Optional: direct fallback if signals were misconfigured
-        if obj.paid and (not old_paid):
-            self._provision_now(obj)
+@admin.action(description="Open door 1 (test)")
+def admin_open_door(modeladmin, request, queryset):
+    done, fail = 0, 0
+    for t in queryset:
+        res = open_door(t, door_no=1)
+        done += 1 if res.get("ok") else 0
+        fail += 0 if res.get("ok") else 1
+    modeladmin.message_user(request, f"Open door sent: OK={done}, Failed={fail}")
 
-    def _provision_now(self, appt: Appointment):
-        # Provision appointment directly to terminals
-        emp = f"APT{appt.id}"
-        # Make user name unique per appointment to avoid conflicts
-        patient_name = f"{appt.patient.full_name} - {appt.procedure.title} #{appt.id}"
-        def _do():
-            for door in Door.objects.all():
-                try:
-                    c = HikClient(door.terminal_ip, door.terminal_username, door.terminal_password)
-                    c.create_user(emp, patient_name, appt.valid_from, appt.valid_to)
-                    c.bind_card(emp, appt.card_no, appt.valid_from, appt.valid_to)
-                    c.grant_door(emp, door_no=1, time_section_no=1)
-                    log.info(f"[ADMIN][{door.name}] Provision OK for appt {appt.id}")
-                except Exception as e:
-                    log.exception(f"[ADMIN][{door.name}] Provision FAILED for appt {appt.id}: {e}")
-        transaction.on_commit(_do)
+# REMOVED: Card management admin actions - Not needed for Remote-Only Mode
 
-
-# Access Event Admin
-@admin.register(AccessEvent)
-class AccessEventAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'card_no', 'result', 'reason', 'source', 'patient_name', 'operator')
-    list_filter = ('result', 'source', 'timestamp')
-    search_fields = ('card_no', 'reason', 'operator', 'appointment__patient__first_name', 'appointment__patient__last_name')
-    ordering = ('-timestamp',)
-    readonly_fields = ('timestamp', 'ip_address', 'user_agent')
-    date_hierarchy = 'timestamp'
+# Terminal Admin
+class TerminalAdmin(admin.ModelAdmin):
+    list_display = ("terminal_name", "terminal_ip", "mode", "active", "reachable", "last_seen", "short_error", "action_buttons")
+    list_filter = ("mode", "active", "reachable", "created_at")
+    search_fields = ("terminal_name", "terminal_ip", "terminal_username")
+    actions = [admin_test_connection, admin_open_door]
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def short_error(self, obj):
+        return (obj.last_error or "")[:60]
+    short_error.short_description = "Last Error"
+    
+    def action_buttons(self, obj):
+        health_url = reverse('medical_access:admin_terminal_health', args=[obj.pk])
+        open_url = reverse('medical_access:admin_terminal_open', args=[obj.pk])
+        
+        return format_html(
+            '<a class="button" href="{}" style="background: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Health</a>'
+            '<a class="button" href="{}" style="background: #007cba; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;" onclick="return confirm(\'Open door on {}?\')">Open</a>',
+            health_url, open_url, obj.terminal_name
+        )
+    action_buttons.short_description = "Actions"
+    action_buttons.allow_tags = True
     
     fieldsets = (
-        ('Access Details', {
-            'fields': ('card_no', 'result', 'reason', 'source')
+        ('Terminal Information', {
+            'fields': ('terminal_name', 'terminal_ip', 'mode')
         }),
-        ('Related Records', {
-            'fields': ('appointment', 'door', 'operator')
+        ('Credentials', {
+            'fields': ('terminal_username', 'terminal_password')
         }),
-        ('Audit Information', {
-            'fields': ('timestamp', 'ip_address', 'user_agent'),
+        ('Health Status', {
+            'fields': ('reachable', 'last_seen', 'last_error'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
-    
-    def patient_name(self, obj):
-        return obj.patient_name
-    patient_name.short_description = 'Patient'
 
-# Register the custom User model
+# Register all models with the custom admin site
+medical_admin_site.register(User, CustomUserAdmin)
+medical_admin_site.register(Doctor, DoctorAdmin)
+medical_admin_site.register(Patient, PatientAdmin)
+medical_admin_site.register(Appointment, AppointmentAdmin)
+medical_admin_site.register(Terminal, TerminalAdmin)
+
+# Also register with default admin site for super admin users
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(Doctor, DoctorAdmin)
+admin.site.register(Patient, PatientAdmin)
+admin.site.register(Appointment, AppointmentAdmin)
+admin.site.register(Terminal, TerminalAdmin)

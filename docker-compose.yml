@@ -28,10 +28,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-payverify}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - USE_POSTGRES=True
       - SECRET_KEY=${SECRET_KEY:-django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
-      - HIK_VISITOR_EMPLOYEE_NO=${HIK_VISITOR_EMPLOYEE_NO:-VISITOR}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*
     depends_on:
       db:
         condition: service_healthy

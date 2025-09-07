@@ -4,66 +4,13 @@
 
 {% block content %}
 <div class="patient-registration-page">
-    <!-- New Receipt Form Section -->
-    <div class="patient-registration-form-section">
-        <div class="patient-registration-form-header">
-            <h2 class="patient-registration-form-title">New Receipt</h2>
+    <!-- Page Header -->
+    <div class="patient-registration-page-header">
+        <h1 class="patient-registration-page-title">Patient Registration</h1>
+        <div class="patient-registration-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="patient-registration-page-btn patient-registration-page-btn--secondary">Back to Dashboard</a>
+            <button class="patient-registration-page-btn patient-registration-page-btn--primary" onclick="openAddAppointmentModal()">Add New Appointment</button>
         </div>
-        <form id="newReceiptForm" class="patient-registration-form">
-            {% csrf_token %}
-            <div class="patient-registration-form-row">
-                <div class="patient-registration-form-group">
-                    <label for="first_name" class="patient-registration-form-label">Patient's First Name</label>
-                    <input type="text" id="first_name" name="first_name" value="Ivan" class="patient-registration-form-input" required>
-                </div>
-                
-                <div class="patient-registration-form-group">
-                    <label for="last_name" class="patient-registration-form-label">Patient's Last Name</label>
-                    <input type="text" id="last_name" name="last_name" value="Ivanov" class="patient-registration-form-input" required>
-                </div>
-            </div>
-            
-            <div class="patient-registration-form-group">
-                <label for="phone" class="patient-registration-form-label">Phone (Optional)</label>
-                <input type="tel" id="phone" name="phone" placeholder="+998 ..." class="patient-registration-form-input">
-            </div>
-            
-            <div class="patient-registration-form-group">
-                <label for="procedure" class="patient-registration-form-label">Procedure</label>
-                <select id="procedure" name="procedure_id" class="patient-registration-form-select" required>
-                    <option value="">— Select Procedure —</option>
-                    {% for procedure in procedures %}
-                    <option value="{{ procedure.id }}" data-price="{{ procedure.price }}">{{ procedure.title }}</option>
-                    {% endfor %}
-                </select>
-                <div class="patient-registration-procedure-buttons">
-                    {% for procedure in procedures %}
-                    <button type="button" class="patient-registration-procedure-btn" onclick="selectProcedure({{ procedure.id }})">{{ procedure.title }}</button>
-                    {% endfor %}
-                </div>
-            </div>
-            
-            <div class="patient-registration-form-group">
-                <label for="doctor" class="patient-registration-form-label">Doctor (Optional)</label>
-                <select id="doctor" name="doctor_id" class="patient-registration-form-select" disabled>
-                    <option value="">— Not Selected —</option>
-                </select>
-                <small id="doctor-help" class="patient-registration-form-hint">Select a procedure first to see available doctors</small>
-            </div>
-            
-            <div class="patient-registration-form-group">
-                <label for="amount" class="patient-registration-form-label">Amount (sum)</label>
-                <input type="number" id="amount" name="amount" value="0" step="0.01" class="patient-registration-form-input" required>
-                <small class="patient-registration-form-hint">It will be substituted from the procedure, but it can be adjusted.</small>
-            </div>
-            
-
-            
-            <div class="patient-registration-form-actions">
-                <button type="submit" class="patient-registration-btn patient-registration-btn--primary">Create Receipt</button>
-                <button type="button" class="patient-registration-btn patient-registration-btn--secondary" onclick="createAndOpen()">Create and Open</button>
-            </div>
-        </form>
     </div>
     
     <!-- Latest Receipts Section -->
@@ -72,14 +19,8 @@
             <h3 class="patient-registration-receipts-title">Latest Receipts</h3>
         </div>
         
-        <!-- Filters and Search Controls -->
+        <!-- Search and Export Controls -->
         <div class="patient-registration-controls-row">
-            <button class="patient-registration-filter-btn patient-registration-filter-btn--active" data-filter="all">All</button>
-            <button class="patient-registration-filter-btn" data-filter="paid">Paid</button>
-            <button class="patient-registration-filter-btn" data-filter="entered">Entered</button>
-            <button class="patient-registration-filter-btn" data-filter="exited">Came out</button>
-            
-            <input type="date" id="searchDate" name="searchDate" class="patient-registration-search-input">
             <input type="text" id="searchQuery" name="searchQuery" placeholder="Search by name/phone" class="patient-registration-search-input">
             <button type="button" class="patient-registration-btn patient-registration-btn--search" onclick="searchReceipts()">Search</button>
             <button type="button" class="patient-registration-btn patient-registration-btn--export" onclick="exportCSV()">CSV Export</button>
@@ -109,31 +50,23 @@
                             <span class="patient-registration-patient-phone">{{ appointment.patient.phone }}</span>
                             {% endif %}
                         </td>
-                        <td class="patient-registration-table-cell">{{ appointment.procedure.title }}</td>
+                        <td class="patient-registration-table-cell">{{ appointment.doctor.procedure }}</td>
                         <td class="patient-registration-table-cell">
-                            {% if appointment.doctor %}
-                                {{ appointment.doctor.full_name }}
-                            {% else %}
-                                —
-                            {% endif %}
+                            {{ appointment.doctor.full_name }}
                         </td>
                         <td class="patient-registration-table-cell">
-                            <span class="patient-registration-amount">{{ appointment.procedure.price }} sum</span>
+                            <span class="patient-registration-amount">{{ appointment.doctor.price }} sum</span>
                         </td>
                         <td class="patient-registration-table-cell">
-                            {% if appointment.paid %}
-                                <span class="status-badge status-badge--paid">Paid</span>
-                            {% else %}
-                                <span class="status-badge status-badge--pending">Pending</span>
-                            {% endif %}
+                            <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
                         </td>
                         <td class="patient-registration-table-cell">
-                            <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
-                               class="patient-registration-action-btn patient-registration-action-btn--open" target="_blank">Open</a>
-                            {% if appointment.paid %}
-                            <a href="{% url 'medical_access:generate_receipt' appointment.id %}" 
-                               class="patient-registration-action-btn patient-registration-action-btn--print" target="_blank">Print</a>
-                            {% endif %}
+                            <div class="patient-registration-actions">
+                                <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
+                                   class="patient-registration-action-btn patient-registration-action-btn--open" target="_blank">Open</a>
+                                <a href="{% url 'medical_access:generate_receipt' appointment.id %}" 
+                                   class="patient-registration-action-btn patient-registration-action-btn--print" target="_blank">Print</a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
@@ -149,37 +82,90 @@
     </div>
 </div>
 
+<!-- Add Appointment Modal -->
+<div id="addAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Add New Appointment</h2>
+            <button class="modal-close" onclick="closeAddAppointmentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addAppointmentForm" class="modal-form">
+                {% csrf_token %}
+                <div class="modal-form-row">
+                    <div class="modal-form-group">
+                        <label for="modal_first_name" class="modal-form-label">Patient's First Name</label>
+                        <input type="text" id="modal_first_name" name="first_name" class="modal-form-input" required>
+                    </div>
+                    
+                    <div class="modal-form-group">
+                        <label for="modal_last_name" class="modal-form-label">Patient's Last Name</label>
+                        <input type="text" id="modal_last_name" name="last_name" class="modal-form-input" required>
+                    </div>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_phone" class="modal-form-label">Phone (Optional)</label>
+                    <input type="tel" id="modal_phone" name="phone" placeholder="+998 ..." class="modal-form-input">
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_passport_series" class="modal-form-label">Passport Series</label>
+                    <input type="text" id="modal_passport_series" name="passport_series" placeholder="AA" class="modal-form-input">
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_passport_number" class="modal-form-label">Passport Number</label>
+                    <input type="text" id="modal_passport_number" name="passport_number" placeholder="1234567" class="modal-form-input">
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_doctor" class="modal-form-label">Doctor & Procedure</label>
+                    <select id="modal_doctor" name="doctor_id" class="modal-form-select" required>
+                        <option value="">— Select Doctor —</option>
+                        {% for doctor in doctors %}
+                        <option value="{{ doctor.id }}" data-price="{{ doctor.price }}">{{ doctor.full_name }} - {{ doctor.procedure }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_amount" class="modal-form-label">Amount (sum)</label>
+                    <input type="number" id="modal_amount" name="amount" value="0" step="0.01" class="modal-form-input" required>
+                    <small class="modal-form-hint">It will be substituted from the procedure, but it can be adjusted.</small>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn--secondary" onclick="closeAddAppointmentModal()">Cancel</button>
+            <button type="button" class="modal-btn modal-btn--primary" onclick="submitAddAppointment()">Create Appointment</button>
+            <button type="button" class="modal-btn modal-btn--success" onclick="submitAddAppointmentAndOpen()">Create and Open</button>
+        </div>
+    </div>
+</div>
+
 <div id="message" class="message" style="display: none;"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Select procedure and update amount
-function selectProcedure(procedureId) {
-    const select = document.getElementById('procedure');
-    const amountInput = document.getElementById('amount');
-    
-    select.value = procedureId;
-    const option = select.options[select.selectedIndex];
-    const price = option.dataset.price;
-    
-    if (price) {
-        amountInput.value = price;
-        amountInput.disabled = true;
-    } else {
-        amountInput.disabled = false;
-    }
-    
-    // Trigger change event
-    select.dispatchEvent(new Event('change'));
+// Modal Functions
+function openAddAppointmentModal() {
+    document.getElementById('addAppointmentModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
 }
 
-// Update amount when procedure changes
-document.getElementById('procedure').addEventListener('change', function() {
+function closeAddAppointmentModal() {
+    document.getElementById('addAppointmentModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Reset form
+    document.getElementById('addAppointmentForm').reset();
+}
+
+// Update amount when modal doctor changes
+document.getElementById('modal_doctor').addEventListener('change', function() {
     const option = this.options[this.selectedIndex];
-    const amountInput = document.getElementById('amount');
-    const doctorSelect = document.getElementById('doctor');
-    const doctorHelp = document.getElementById('doctor-help');
+    const amountInput = document.getElementById('modal_amount');
     
     // Update amount and disable/enable input
     if (option.dataset.price) {
@@ -188,82 +174,44 @@ document.getElementById('procedure').addEventListener('change', function() {
     } else {
         amountInput.disabled = false;
     }
-    
-    // Update doctor selection
-    if (option.value) {
-        loadDoctorsForProcedure(option.value);
-        doctorHelp.textContent = 'Loading doctors...';
-    } else {
-        // Clear doctor selection when no procedure is selected
-        doctorSelect.innerHTML = '<option value="">— not selected —</option>';
-        doctorHelp.textContent = 'Select a procedure first to see available doctors';
-    }
 });
 
-// Function to load doctors for a specific procedure
-function loadDoctorsForProcedure(procedureId) {
-    const doctorSelect = document.getElementById('doctor');
-    const doctorHelp = document.getElementById('doctor-help');
-    
-    // Show loading state
-    doctorHelp.textContent = 'Loading doctors...';
-    doctorHelp.className = 'form-hint loading';
-    
-    fetch(`/medical_access/procedures/${procedureId}/doctors/`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.doctors.length > 0) {
-                // Populate doctor dropdown
-                doctorSelect.innerHTML = '<option value="">— not selected —</option>';
-                data.doctors.forEach(doctor => {
-                    const option = document.createElement('option');
-                    option.value = doctor.id;
-                    option.textContent = doctor.full_name;
-                    doctorSelect.appendChild(option);
-                });
-                
-                // Show success message
-                doctorHelp.textContent = `${data.doctors.length} doctor(s) available for this procedure`;
-                doctorHelp.className = 'form-hint success';
-                
-                // Enable doctor selection
-                doctorSelect.disabled = false;
-            } else {
-                // No doctors assigned to this procedure
-                doctorSelect.innerHTML = '<option value="">— no doctors assigned —</option>';
-                doctorHelp.textContent = 'No doctors are currently assigned to this procedure';
-                doctorHelp.className = 'form-hint warning';
-                
-                // Disable doctor selection
-                doctorSelect.disabled = true;
-            }
-        })
-        .catch(error => {
-            // Show error state
-            doctorSelect.innerHTML = '<option value="">— error loading doctors —</option>';
-            doctorHelp.textContent = 'Error loading doctors. Please try again.';
-            doctorHelp.className = 'form-hint error';
-            
-            // Disable doctor selection
-            doctorSelect.disabled = true;
-            console.error('Error loading doctors:', error);
-        });
-}
 
-// Form submission
-document.getElementById('newReceiptForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
+// Modal form submission functions
+function submitAddAppointment() {
+    const form = document.getElementById('addAppointmentForm');
+    const formData = new FormData(form);
     const data = {
         first_name: formData.get('first_name'),
         last_name: formData.get('last_name'),
         phone: formData.get('phone'),
-        procedure_id: formData.get('procedure_id'),
-        doctor_id: formData.get('doctor_id') || null,
+        passport_series: formData.get('passport_series'),
+        passport_number: formData.get('passport_number'),
+        doctor_id: formData.get('doctor_id'),
         amount: formData.get('amount')
     };
     
+    createAppointment(data, false);
+}
+
+function submitAddAppointmentAndOpen() {
+    const form = document.getElementById('addAppointmentForm');
+    const formData = new FormData(form);
+    const data = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        phone: formData.get('phone'),
+        passport_series: formData.get('passport_series'),
+        passport_number: formData.get('passport_number'),
+        doctor_id: formData.get('doctor_id'),
+        amount: formData.get('amount')
+    };
+    
+    createAppointment(data, true);
+}
+
+// Generic appointment creation function
+function createAppointment(data, openAfterCreate = false) {
     fetch('{% url "medical_access:create_appointment" %}', {
         method: 'POST',
         headers: {
@@ -276,8 +224,15 @@ document.getElementById('newReceiptForm').addEventListener('submit', function(e)
     .then(data => {
         if (data.success) {
             showMessage(data.message, 'success');
+            closeAddAppointmentModal();
             // Reload page to show new appointment
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => {
+                location.reload();
+                if (openAfterCreate && data.appointment_id) {
+                    // Open the created appointment in a new tab
+                    window.open(`{% url 'medical_access:appointment_detail' 0 %}`.replace('0', data.appointment_id), '_blank');
+                }
+            }, 1500);
         } else {
             showMessage(data.message, 'error');
         }
@@ -285,12 +240,6 @@ document.getElementById('newReceiptForm').addEventListener('submit', function(e)
     .catch(error => {
         showMessage('Error creating appointment', 'error');
     });
-});
-
-// Create and open receipt
-function createAndOpen() {
-    // Submit form and then open the created receipt
-    document.getElementById('newReceiptForm').dispatchEvent(new Event('submit'));
 }
 
 // Open receipt
@@ -298,53 +247,17 @@ function openReceipt(appointmentId) {
     window.open(`{% url 'medical_access:appointment_detail' 0 %}`.replace('0', appointmentId), '_blank');
 }
 
-// Filter receipts functionality
-document.querySelectorAll('.receipt-filter-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        // Remove active class from all buttons
-        document.querySelectorAll('.receipt-filter-btn').forEach(btn => btn.classList.remove('active'));
-        // Add active class to clicked button
-        this.classList.add('active');
-        
-        const filter = this.dataset.filter;
-        filterReceipts(filter);
-    });
-});
-
-function filterReceipts(filter) {
-    const rows = document.querySelectorAll('.receipts-table tbody tr');
-    
-    rows.forEach(row => {
-        if (filter === 'all') {
-            row.style.display = '';
-        } else if (filter === 'paid') {
-            const statusCell = row.querySelector('td:nth-child(6)');
-            const isPaid = statusCell.textContent.includes('PAID');
-            row.style.display = isPaid ? '' : 'none';
-        } else if (filter === 'entered') {
-            // This would need backend logic to determine if patient entered
-            // For now, show all rows
-            row.style.display = '';
-        } else if (filter === 'exited') {
-            // This would need backend logic to determine if patient exited
-            // For now, show all rows
-            row.style.display = '';
-        }
-    });
-}
-
 // Enhanced search functionality
 function searchReceipts() {
-    const date = document.getElementById('searchDate').value;
     const query = document.getElementById('searchQuery').value.toLowerCase();
     
-    const rows = document.querySelectorAll('.receipts-table tbody tr');
+    const rows = document.querySelectorAll('.patient-registration-table tbody tr');
     
     rows.forEach(row => {
-        const patientName = row.querySelector('.patient-name')?.textContent.toLowerCase() || '';
-        const patientPhone = row.querySelector('.patient-phone')?.textContent.toLowerCase() || '';
-        const procedureName = row.querySelector('.procedure-name')?.textContent.toLowerCase() || '';
-        const doctorName = row.querySelector('.doctor-name')?.textContent.toLowerCase() || '';
+        const patientName = row.querySelector('.patient-registration-patient-name')?.textContent.toLowerCase() || '';
+        const patientPhone = row.querySelector('.patient-registration-patient-phone')?.textContent.toLowerCase() || '';
+        const procedureName = row.querySelector('td:nth-child(3)')?.textContent.toLowerCase() || '';
+        const doctorName = row.querySelector('td:nth-child(4)')?.textContent.toLowerCase() || '';
         
         const matchesSearch = !query || 
             patientName.includes(query) || 
@@ -352,8 +265,6 @@ function searchReceipts() {
             procedureName.includes(query) || 
             doctorName.includes(query);
         
-        // Date filtering would need backend implementation
-        // For now, just show/hide based on search query
         row.style.display = matchesSearch ? '' : 'none';
     });
     
@@ -363,58 +274,73 @@ function searchReceipts() {
     }
 }
 
-// Enhanced CSV export
+// Enhanced Excel export for today's appointments only
 function exportCSV() {
-    const table = document.querySelector('.receipts-table table');
+    const table = document.querySelector('.patient-registration-table');
     const rows = Array.from(table.querySelectorAll('tr'));
+    const today = new Date().toISOString().split('T')[0];
     
     let csv = [];
     
     // Add headers
     const headers = Array.from(rows[0].querySelectorAll('th')).map(th => th.textContent);
-    csv.push(headers.join(','));
+    csv.push(headers.join('\t')); // Use tab separator for Excel
     
-    // Add data rows
+    // Add data rows - only today's appointments
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        const cells = Array.from(row.querySelectorAll('td'));
-        const rowData = cells.map(cell => {
-            // Clean up the cell content (remove HTML, get just text)
-            let text = cell.textContent.trim();
-            // Escape commas and quotes for CSV
-            if (text.includes(',') || text.includes('"')) {
-                text = `"${text.replace(/"/g, '""')}"`;
-            }
-            return text;
-        });
-        csv.push(rowData.join(','));
+        if (row.style.display !== 'none') { // Only include visible rows
+            const cells = Array.from(row.querySelectorAll('td'));
+            const rowData = cells.map(cell => {
+                // Clean up the cell content (remove HTML, get just text)
+                let text = cell.textContent.trim();
+                // Escape tabs and quotes for Excel
+                if (text.includes('\t') || text.includes('"')) {
+                    text = `"${text.replace(/"/g, '""')}"`;
+                }
+                return text;
+            });
+            csv.push(rowData.join('\t'));
+        }
     }
     
-    // Create and download CSV file
-    const csvContent = csv.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Create and download Excel file
+    const excelContent = csv.join('\n');
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `receipts_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `today_appointments_${today}.xls`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    showMessage('CSV file downloaded successfully!', 'success');
+    showMessage('Today\'s appointments exported to Excel successfully!', 'success');
+}
+
+// Utility Functions
+function showMessage(message, type) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.textContent = message;
+    messageDiv.className = `message ${type}`;
+    messageDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        messageDiv.style.display = 'none';
+    }, 5000);
 }
 
 // Hotkeys
 document.addEventListener('keydown', function(e) {
     if (e.key === 'F9') {
         e.preventDefault();
-        document.getElementById('newReceiptForm').dispatchEvent(new Event('submit'));
+        openAddAppointmentModal();
     }
     
     if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
-        createAndOpen();
+        openAddAppointmentModal();
     }
 });
 </script>

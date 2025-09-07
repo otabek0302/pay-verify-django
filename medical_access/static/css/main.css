@@ -1,12 +1,9 @@
 /* === PayVerify - Main CSS File === */
 
 /* === Import Page Specific Styles === */
-@import url('pages/components.css');
 @import url('pages/dashboard_page.css');
-@import url('pages/scanning_page.css');
 @import url('pages/patient_registration_page.css');
 @import url('pages/doctors_page.css');
-@import url('pages/procedures_page.css');
 @import url('pages/patients_page.css');
 @import url('pages/appointments_page.css');
 @import url('pages/appointment_detail_page.css');
@@ -135,36 +132,28 @@
 :root {
     --primary-color: #007BFF;
     --primary-dark: #0056b3;
-    --primary-light: #66b3ff;
     --secondary-color: #6c757d;
-    --accent-color: #e3f2fd;
     --success-color: #28a745;
     --error-color: #dc3545;
     --warning-color: #ffc107;
     --info-color: #17a2b8;
 
-
     --background: #ffffff;
     --surface: #f9f9f9;
     --surface-elevated: #ffffff;
     --sidebar-bg: #ffffff;
-    --sidebar-active: #e3f2fd;
 
     --text-primary: #212529;
     --text-secondary: #6c757d;
     --text-muted: #adb5bd;
 
-    --shadow-none: none;
-
     --border: #dee2e6;
     --border-light: #e9ecef;
 
-    --radius-sm: 8px;
     --radius: 10px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
-    --radius-2xl: 26px;
 }
 
 /* === Reset and Base Styles === */
@@ -356,6 +345,289 @@ select:focus-visible {
     padding: 16px;
     width: 100%;
     min-height: 100vh;
+}
+
+/* === Pagination Styles === */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    padding: 20px 0;
+    gap: 20px;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: transparent;
+    padding: 0;
+    order: 1;
+}
+
+.pagination-numbers {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pagination-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pagination-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    background: transparent;
+    border: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.pagination-link:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+.pagination-link--current {
+    background: #3b82f6;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+}
+
+.pagination-link--first,
+.pagination-link--last {
+    font-weight: 500;
+    min-width: auto;
+    padding: 0 12px;
+    color: #6b7280;
+}
+
+.pagination-link--first:hover,
+.pagination-link--last:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.pagination-link--prev,
+.pagination-link--next {
+    font-weight: 500;
+    min-width: auto;
+    padding: 0 12px;
+    color: #6b7280;
+}
+
+.pagination-link--prev:hover,
+.pagination-link--next:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 400;
+    background: transparent;
+    padding: 0;
+    white-space: nowrap;
+    order: 0;
+}
+
+.pagination-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+/* Pagination Responsive */
+@media (max-width: 768px) {
+    .pagination-container {
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+    }
+    
+    .pagination {
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .pagination-numbers {
+        gap: 6px;
+    }
+    
+    .pagination-nav {
+        gap: 6px;
+    }
+    
+    .pagination-link {
+        min-width: 30px;
+        height: 30px;
+        padding: 0 6px;
+        font-size: 13px;
+    }
+    
+    .pagination-link--prev,
+    .pagination-link--next {
+        padding: 0 10px;
+    }
+    
+    .pagination-info {
+        font-size: 13px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .pagination {
+        gap: 8px;
+        flex-direction: column;
+    }
+    
+    .pagination-numbers {
+        gap: 4px;
+    }
+    
+    .pagination-nav {
+        gap: 4px;
+    }
+    
+    .pagination-link {
+        min-width: 28px;
+        height: 28px;
+        padding: 0 4px;
+        font-size: 12px;
+    }
+    
+    .pagination-link--prev,
+    .pagination-link--next {
+        padding: 0 8px;
+    }
+}
+
+/* === Global Status Badge Standards === */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.status-badge--active {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--success-color);
+}
+
+.status-badge--enter {
+    background-color: rgba(0, 123, 255, 0.1);
+    color: var(--primary-color);
+}
+
+.status-badge--leave {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: var(--text-muted);
+}
+
+.status-badge--used {
+    background-color: rgba(0, 123, 255, 0.15);
+    color: #0066cc;
+    font-weight: 600;
+}
+
+.status-badge--expired {
+    background-color: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.status-badge--info {
+    background-color: rgba(0, 123, 255, 0.1);
+    color: var(--primary-color);
+}
+
+/* === Global Button Standards === */
+.action-btn {
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.action-btn--primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.action-btn--primary:hover {
+    background: var(--primary-dark);
+    color: white;
+}
+
+.action-btn--success {
+    background: var(--success-color);
+    color: white;
+}
+
+.action-btn--success:hover {
+    background: var(--success-dark);
+    color: white;
+}
+
+.action-btn--error {
+    background: var(--error-color);
+    color: white;
+}
+
+.action-btn--error:hover {
+    background: #dc2626;
+    color: white;
+}
+
+.action-btn--secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.action-btn--secondary:hover {
+    background: #5a6268;
+    color: white;
 }
 
 /* === Main Content Styles === */

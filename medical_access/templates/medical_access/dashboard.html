@@ -2,48 +2,57 @@
 {% block title %}Dashboard - PayVerify{% endblock %} 
 {% block content %}
 <div class="dashboard-content">
+    <!-- Dashboard Header with Period Selector -->
+    <div class="dashboard-header">
+        <div class="dashboard-title">
+            <h1>Dashboard</h1>
+        </div>
+        <div class="dashboard-period-selector">
+            <label for="period-select" class="period-label">View Data:</label>
+            <select id="period-select" class="period-select">
+                <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
+                <option value="week" {% if period == 'week' %}selected{% endif %}>This Week</option>
+                <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
+            </select>
+        </div>
+    </div>
+
     <!-- Statistics Cards Section -->
     <div class="dashboard-stats-grid">
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Revenue (Today)</div>
-            <div class="dashboard-stat-card-value">{{ statistics.today_revenue }} sum</div>
+            <div class="dashboard-stat-card-title">Revenue ({{ period_label }})</div>
+            <div class="dashboard-stat-card-value">{{ statistics.period_revenue }} sum</div>
         </div>
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Receipts (Today)</div>
-            <div class="dashboard-stat-card-value">{{ statistics.today_receipts }}</div>
+            <div class="dashboard-stat-card-title">Appointments ({{ period_label }})</div>
+            <div class="dashboard-stat-card-value">{{ statistics.period_receipts }}</div>
         </div>
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Scans 24h – Allow/Deny</div>
-            <div class="dashboard-stat-card-value">{{ statistics.scans_24h_allow }}/{{ statistics.scans_24h_deny }}</div>
+            <div class="dashboard-stat-card-title">Active QR Codes</div>
+            <div class="dashboard-stat-card-value">{{ statistics.active_appointments }}</div>
         </div>
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Active Posts (5 min)</div>
-            <div class="dashboard-stat-card-value">{{ statistics.active_posts }}</div>
-        </div>
-        <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Active Doctors</div>
+            <div class="dashboard-stat-card-title">Total Doctors</div>
             <div class="dashboard-stat-card-value">{{ statistics.active_doctors }}</div>
-        </div>
-        <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Active Procedures</div>
-            <div class="dashboard-stat-card-value">{{ statistics.active_procedures }}</div>
         </div>
         <div class="dashboard-stat-card">
             <div class="dashboard-stat-card-title">Total Patients</div>
             <div class="dashboard-stat-card-value">{{ statistics.total_patients }}</div>
         </div>
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Locations</div>
-            <div class="dashboard-stat-card-value">{{ statistics.total_locations }}</div>
+            <div class="dashboard-stat-card-title">Success Rate</div>
+            <div class="dashboard-stat-card-value">
+                {% if statistics.period_receipts > 0 %}
+                    {{ statistics.active_appointments|floatformat:1 }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <!-- Recent Appointments Section -->
     <div class="dashboard-appointments">
-        <div class="appointments-header">
-            <h3 class="appointments-card-title">Recent Appointments</h3>
-            <a href="{% url 'medical_access:appointments' %}" class="appointments-card-link">View All</a>
-        </div>
         <div class="appointments-body">
             <table class="appointments-table">
                 <thead class="table-head">
@@ -60,18 +69,14 @@
                 {% for appointment in latest_appointments %}
                 <tr class="table-row">
                     <td class="table-cell">#APT{{ appointment.id|stringformat:"03d" }}</td>
-                    <td class="table-cell">{{ appointment.appointment_date|date:"M d, Y" }}</td>
+                    <td class="table-cell">{{ appointment.created_at|date:"M d, Y" }}</td>
                     <td class="table-cell">{{ appointment.patient.full_name }}</td>
                     <td class="table-cell">{{ appointment.doctor.full_name }}</td>
                     <td class="table-cell">
-                        {% if appointment.paid %}
-                            <span class="status-badge status-badge--completed">Paid</span>
-                        {% else %}
-                            <span class="status-badge status-badge--pending">Pending</span>
-                        {% endif %}
+                        <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
                     </td>
                     <td class="table-cell">
-                        <a href="{% url 'medical_access:appointments' %}" class="table-link">View Details</a>
+                        <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="table-link">View Details</a>
                     </td>
                 </tr>
                 {% empty %}
@@ -84,4 +89,19 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodSelect = document.getElementById('period-select');
+    
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function() {
+            const selectedPeriod = this.value;
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('period', selectedPeriod);
+            window.location.href = currentUrl.toString();
+        });
+    }
+});
+</script>
 {% endblock %}
