@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("medical_access", "0007_remove_scan_log_model"),
+        ("medical_access", "0005_add_active_field_to_terminal"),
     ]
 
     operations = [

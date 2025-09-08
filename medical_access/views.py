@@ -800,7 +800,7 @@ def update_appointment(request, appointment_id):
 
 @login_required
 def delete_appointment(request, appointment_id):
-    """Delete an appointment - admin and super admin only"""
+    """Delete an appointment and associated patient - admin and super admin only"""
     # Check user role and redirect accordingly
     if request.user.role not in [User.Role.ADMIN, User.Role.SUPER_ADMIN]:
         return JsonResponse({'success': False, 'message': 'Permission denied'}, status=403)
@@ -813,12 +813,15 @@ def delete_appointment(request, appointment_id):
             patient = appointment.patient
             patient_name = patient.full_name
             
-            # Delete the appointment (patient will be preserved due to DO_NOTHING)
+            # Delete the appointment first
             appointment.delete()
+            
+            # Delete the associated patient
+            patient.delete()
             
             return JsonResponse({
                 'success': True, 
-                'message': f'Appointment deleted successfully. Patient "{patient_name}" record is preserved.'
+                'message': f'Appointment and patient "{patient_name}" deleted successfully.'
             })
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)}, status=400)

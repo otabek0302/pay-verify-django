@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("medical_access", "0003_alter_user_role"),
+        ("medical_access", "0001_initial"),
     ]
 
     operations = [

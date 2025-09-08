@@ -126,7 +126,45 @@
     opacity: 0;
 }
 
-/* === Legacy Message Styles Removed - Now Using Toast System Only === */
+/* === Message Styles (for backward compatibility) === */
+.message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(100%);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10000;
+    display: none;
+}
+
+.message.show {
+    transform: translateX(0);
+}
+
+.message.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.message.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.message.info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.message.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
 
 /* === CSS Variables - Design System === */
 :root {

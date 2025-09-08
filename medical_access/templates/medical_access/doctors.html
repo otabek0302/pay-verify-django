@@ -383,5 +383,15 @@ function showMessage(message, type) {
         }, 300);
     }, 5000);
 }
+
+function clearDoctorForm() {
+    const form = document.getElementById('createDoctorForm');
+    if (form) {
+        form.reset();
+        // Clear any validation errors
+        const errorElements = form.querySelectorAll('.error');
+        errorElements.forEach(el => el.remove());
+    }
+}
 </script>
 {% endblock %}
