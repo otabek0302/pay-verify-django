@@ -176,6 +176,17 @@
 <script>
 let currentDoctorId = null;
 
+// Utility Functions
+function clearDoctorForm() {
+    const form = document.getElementById('createDoctorForm');
+    if (form) {
+        form.reset();
+        // Clear any validation errors
+        const errorElements = form.querySelectorAll('.error');
+        errorElements.forEach(el => el.remove());
+    }
+}
+
 // Add Doctor Modal Functions
 function openAddDoctorModal() {
     document.getElementById('addDoctorModal').style.display = 'block';
@@ -382,16 +393,6 @@ function showMessage(message, type) {
             messageDiv.style.display = 'none';
         }, 300);
     }, 5000);
-}
-
-function clearDoctorForm() {
-    const form = document.getElementById('createDoctorForm');
-    if (form) {
-        form.reset();
-        // Clear any validation errors
-        const errorElements = form.querySelectorAll('.error');
-        errorElements.forEach(el => el.remove());
-    }
 }
 </script>
 {% endblock %}
