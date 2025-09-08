@@ -177,7 +177,7 @@
 let currentDoctorId = null;
 
 // Utility Functions
-function clearDoctorForm() {
+window.clearDoctorForm = function() {
     const form = document.getElementById('createDoctorForm');
     if (form) {
         form.reset();
@@ -284,11 +284,22 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const formData = new FormData(this);
             const data = {
-                first_name: formData.get('first_name'),
-                last_name: formData.get('last_name'),
-                procedure: formData.get('procedure'),
-                price: formData.get('price')
+                first_name: formData.get('first_name').trim(),
+                last_name: formData.get('last_name').trim(),
+                procedure: formData.get('procedure').trim(),
+                price: parseFloat(formData.get('price')) || 0.00
             };
+            
+            // Validate required fields
+            if (!data.first_name || !data.last_name) {
+                showMessage('First name and last name are required', 'error');
+                return;
+            }
+            
+            if (data.price <= 0) {
+                showMessage('Price must be greater than 0', 'error');
+                return;
+            }
             
             fetch('{% url "medical_access:create_doctor" %}', {
                 method: 'POST',
@@ -300,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Doctor creation response:', data);
                 if (data.success) {
                     showMessage(data.message, 'success');
                     clearDoctorForm();
@@ -377,7 +389,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Utility Functions
 function showMessage(message, type) {
+    console.log('Showing message:', message, 'Type:', type);
     const messageDiv = document.getElementById('message');
+    if (!messageDiv) {
+        console.error('Message div not found');
+        return;
+    }
+    
     messageDiv.textContent = message;
     messageDiv.className = `message ${type}`;
     messageDiv.style.display = 'block';
