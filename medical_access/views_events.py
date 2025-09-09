@@ -127,7 +127,22 @@ def hik_event_receiver(request):
                     continue
                     
                 ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
-                card = ev.get("cardNo") or ev.get("credentialNo") or ev.get("qrCode")
+                
+                # Debug: Log all available fields to see what the terminal is sending
+                logger = logging.getLogger(__name__)
+                logger.info(f"Terminal event data: {ev}")
+                
+                # Try multiple possible field names for QR code data
+                card = (ev.get("cardNo") or 
+                       ev.get("credentialNo") or 
+                       ev.get("qrCode") or
+                       ev.get("qrData") or
+                       ev.get("qr_code") or
+                       ev.get("qrCodeData") or
+                       ev.get("qrContent") or
+                       ev.get("data") or
+                       ev.get("content"))
+                
                 verify = (ev.get("verifyMode") or ev.get("currentVerifyMode") or "").lower()
                 major = ev.get("major") or ev.get("majorEventType")
                 time_str = ev.get("time") or ev.get("dateTime")
