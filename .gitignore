@@ -27,6 +27,11 @@ venv/
 ENV/
 env/
 .env
+.env.local
+.env.production
+
+# Production files (keep templates but exclude sensitive data)
+production.env
 
 # Django
 *.log

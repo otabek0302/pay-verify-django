@@ -1,8 +1,4 @@
-{% extends 'medical_access/base.html' %}
-
-{% block title %}Doctors - PayVerify{% endblock %}
-
-{% block content %}
+{% extends 'medical_access/base.html' %} {% block title %}Doctors - PayVerify{% endblock %} {% block content %}
 <div class="doctors-page">
     <div class="doctors-page-header">
         <h1 class="doctors-page-title">Doctors</h1>
@@ -13,7 +9,7 @@
             {% endif %}
         </div>
     </div>
-    
+
     <div class="doctors-table-section">
         <table class="doctors-table">
             <thead class="doctors-table-head">
@@ -53,31 +49,26 @@
             </tbody>
         </table>
     </div>
-    
+
     <!-- Pagination -->
     {% if page_obj.has_other_pages %}
     <div class="pagination-container">
-        <div class="pagination-info">
-            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} doctors
-        </div>
+        <div class="pagination-info">Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} doctors</div>
         <div class="pagination">
             <div class="pagination-numbers">
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <span class="pagination-link pagination-link--current">{{ num }}</span>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
-                    {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
-                        <span class="pagination-ellipsis">...</span>
-                    {% endif %}
-                {% endfor %}
+                {% for num in page_obj.paginator.page_range %} {% if page_obj.number == num %}
+                <span class="pagination-link pagination-link--current">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
+                {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                <span class="pagination-ellipsis">...</span>
+                {% endif %} {% endfor %}
             </div>
             <div class="pagination-nav">
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
-                {% endif %}
-                {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
+                <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
+                {% endif %} {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
                 {% endif %}
             </div>
         </div>
@@ -86,7 +77,7 @@
 </div>
 
 <!-- Add Doctor Modal -->
-<div id="addDoctorModal" class="doctors-modal" style="display: none;">
+<div id="addDoctorModal" class="doctors-modal" style="display: none">
     <div class="doctors-modal-content">
         <div class="doctors-modal-header">
             <h3 class="doctors-modal-title">Add New Doctor</h3>
@@ -96,19 +87,19 @@
             {% csrf_token %}
             <div class="doctors-modal-form-group">
                 <label for="add_doctor_first_name" class="doctors-modal-form-label">First Name</label>
-                <input type="text" id="add_doctor_first_name" name="first_name" class="doctors-modal-form-input" required>
+                <input type="text" id="add_doctor_first_name" name="first_name" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="add_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
-                <input type="text" id="add_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
+                <input type="text" id="add_doctor_last_name" name="last_name" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="add_doctor_procedure" class="doctors-modal-form-label">Procedure</label>
-                <input type="text" id="add_doctor_procedure" name="procedure" class="doctors-modal-form-input" required>
+                <input type="text" id="add_doctor_procedure" name="procedure" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="add_doctor_price" class="doctors-modal-form-label">Price (sum)</label>
-                <input type="number" id="add_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required>
+                <input type="number" id="add_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-actions">
                 <button type="submit" class="doctors-btn doctors-btn--primary">Add Doctor</button>
@@ -119,7 +110,7 @@
 </div>
 
 <!-- Edit Doctor Modal -->
-<div id="editDoctorModal" class="doctors-modal" style="display: none;">
+<div id="editDoctorModal" class="doctors-modal" style="display: none">
     <div class="doctors-modal-content">
         <div class="doctors-modal-header">
             <h3 class="doctors-modal-title">Edit Doctor</h3>
@@ -127,22 +118,22 @@
         </div>
         <form id="editDoctorForm" class="doctors-modal-form">
             {% csrf_token %}
-            <input type="hidden" id="edit_doctor_id" name="doctor_id">
+            <input type="hidden" id="edit_doctor_id" name="doctor_id" />
             <div class="doctors-modal-form-group">
                 <label for="edit_doctor_first_name" class="doctors-modal-form-label">First Name</label>
-                <input type="text" id="edit_doctor_first_name" name="first_name" class="doctors-modal-form-input" required>
+                <input type="text" id="edit_doctor_first_name" name="first_name" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="edit_doctor_last_name" class="doctors-modal-form-label">Last Name</label>
-                <input type="text" id="edit_doctor_last_name" name="last_name" class="doctors-modal-form-input" required>
+                <input type="text" id="edit_doctor_last_name" name="last_name" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="edit_doctor_procedure" class="doctors-modal-form-label">Procedure</label>
-                <input type="text" id="edit_doctor_procedure" name="procedure" class="doctors-modal-form-input" required>
+                <input type="text" id="edit_doctor_procedure" name="procedure" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-group">
                 <label for="edit_doctor_price" class="doctors-modal-form-label">Price (sum)</label>
-                <input type="number" id="edit_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required>
+                <input type="number" id="edit_doctor_price" name="price" step="0.01" min="0" class="doctors-modal-form-input" required />
             </div>
             <div class="doctors-modal-form-actions">
                 <button type="submit" class="doctors-btn doctors-btn--primary">Update</button>
@@ -153,7 +144,7 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div id="deleteDoctorModal" class="doctors-modal" style="display: none;">
+<div id="deleteDoctorModal" class="doctors-modal" style="display: none">
     <div class="doctors-modal-content">
         <div class="doctors-modal-header">
             <h3 class="doctors-modal-title">Confirm Delete</h3>
@@ -169,248 +160,227 @@
         </div>
     </div>
 </div>
-<div id="message" class="message" style="display: none;"></div>
-{% endblock %}
 
-{% block extra_js %}
+{% endblock %} {% block extra_js %}
 <script>
-let currentDoctorId = null;
+    let currentDoctorId = null;
 
-// Utility Functions
-window.clearDoctorForm = function() {
-    const form = document.getElementById('createDoctorForm');
-    if (form) {
-        form.reset();
-        // Clear any validation errors
-        const errorElements = form.querySelectorAll('.error');
-        errorElements.forEach(el => el.remove());
+    // Utility Functions
+    window.clearDoctorForm = function () {
+        const form = document.getElementById("addDoctorForm");
+        if (form) {
+            form.reset();
+            // Clear any validation errors
+            const errorElements = form.querySelectorAll(".error");
+            errorElements.forEach((el) => el.remove());
+        }
+    };
+
+    // Add Doctor Modal Functions
+    function openAddDoctorModal() {
+        document.getElementById("addDoctorModal").style.display = "block";
     }
-}
 
-// Add Doctor Modal Functions
-function openAddDoctorModal() {
-    document.getElementById('addDoctorModal').style.display = 'block';
-}
-
-function closeAddDoctorModal() {
-    document.getElementById('addDoctorModal').style.display = 'none';
-    document.getElementById('addDoctorForm').reset();
-}
-
-function editDoctor(doctorId, firstName, lastName, procedure, price) {
-    currentDoctorId = doctorId;
-    
-    // Populate the edit form
-    document.getElementById('edit_doctor_id').value = doctorId;
-    document.getElementById('edit_doctor_first_name').value = firstName;
-    document.getElementById('edit_doctor_last_name').value = lastName;
-    document.getElementById('edit_doctor_procedure').value = procedure;
-    document.getElementById('edit_doctor_price').value = price;
-    
-    // Show the modal
-    document.getElementById('editDoctorModal').style.display = 'block';
-}
-
-function editDoctorFromRow(button) {
-    // Get the table row containing the button
-    const row = button.closest('tr');
-    
-    // Get the doctor ID from the data attribute
-    const doctorId = row.getAttribute('data-doctor-id');
-    
-    // Get the current data from the table cells
-    const name = row.cells[1].textContent.trim();
-    const procedure = row.cells[2].textContent.trim();
-    const price = row.cells[3].textContent.replace(' sum', '').trim();
-    
-    // Split name into first and last name
-    const nameParts = name.split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
-    
-    // Call the existing editDoctor function with current data
-    editDoctor(doctorId, firstName, lastName, procedure, price);
-}
-
-function closeEditModal() {
-    document.getElementById('editDoctorModal').style.display = 'none';
-    currentDoctorId = null;
-}
-
-function deleteDoctor(doctorId, fullName) {
-    currentDoctorId = doctorId;
-    document.getElementById('deleteDoctorName').textContent = fullName;
-    document.getElementById('deleteDoctorModal').style.display = 'block';
-}
-
-function closeDeleteModal() {
-    document.getElementById('deleteDoctorModal').style.display = 'none';
-    currentDoctorId = null;
-}
-
-function confirmDeleteDoctor() {
-    if (currentDoctorId) {
-        fetch(`{% url 'medical_access:delete_doctor' 0 %}`.replace('0', currentDoctorId), {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage(data.message, 'success');
-                // Remove the row from the table
-                const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
-                if (row) row.remove();
-                closeDeleteModal();
-            } else {
-                showMessage(data.message, 'error');
-            }
-        })
-        .catch(error => {
-            showMessage('Error deleting doctor', 'error');
-            console.error('Error:', error);
-        });
+    function closeAddDoctorModal() {
+        document.getElementById("addDoctorModal").style.display = "none";
+        document.getElementById("addDoctorForm").reset();
     }
-}
 
-// Add doctor form submission
-document.addEventListener('DOMContentLoaded', function() {
-    const addDoctorForm = document.getElementById('addDoctorForm');
-    if (addDoctorForm) {
-        addDoctorForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = {
-                first_name: formData.get('first_name').trim(),
-                last_name: formData.get('last_name').trim(),
-                procedure: formData.get('procedure').trim(),
-                price: parseFloat(formData.get('price')) || 0.00
-            };
-            
-            // Validate required fields
-            if (!data.first_name || !data.last_name) {
-                showMessage('First name and last name are required', 'error');
-                return;
-            }
-            
-            if (data.price <= 0) {
-                showMessage('Price must be greater than 0', 'error');
-                return;
-            }
-            
-            fetch('{% url "medical_access:create_doctor" %}', {
-                method: 'POST',
+    function editDoctor(doctorId, firstName, lastName, procedure, price) {
+        currentDoctorId = doctorId;
+
+        // Populate the edit form
+        document.getElementById("edit_doctor_id").value = doctorId;
+        document.getElementById("edit_doctor_first_name").value = firstName;
+        document.getElementById("edit_doctor_last_name").value = lastName;
+        document.getElementById("edit_doctor_procedure").value = procedure;
+        document.getElementById("edit_doctor_price").value = price;
+
+        // Show the modal
+        document.getElementById("editDoctorModal").style.display = "block";
+    }
+
+    function editDoctorFromRow(button) {
+        // Get the table row containing the button
+        const row = button.closest("tr");
+
+        // Get the doctor ID from the data attribute
+        const doctorId = row.getAttribute("data-doctor-id");
+
+        // Get the current data from the table cells
+        const name = row.cells[1].textContent.trim();
+        const procedure = row.cells[2].textContent.trim();
+        const price = row.cells[3].textContent.replace(" sum", "").trim();
+
+        // Split name into first and last name
+        const nameParts = name.split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        // Call the existing editDoctor function with current data
+        editDoctor(doctorId, firstName, lastName, procedure, price);
+    }
+
+    function closeEditModal() {
+        document.getElementById("editDoctorModal").style.display = "none";
+        currentDoctorId = null;
+    }
+
+    function deleteDoctor(doctorId, fullName) {
+        currentDoctorId = doctorId;
+        document.getElementById("deleteDoctorName").textContent = fullName;
+        document.getElementById("deleteDoctorModal").style.display = "block";
+    }
+
+    function closeDeleteModal() {
+        document.getElementById("deleteDoctorModal").style.display = "none";
+        currentDoctorId = null;
+    }
+
+    function confirmDeleteDoctor() {
+        if (currentDoctorId) {
+            fetch(`{% url 'medical_access:delete_doctor' 0 %}`.replace("0", currentDoctorId), {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
                 },
-                body: JSON.stringify(data)
             })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Doctor creation response:', data);
-                if (data.success) {
-                    showMessage(data.message, 'success');
-                    clearDoctorForm();
-                    // Reload page to show new doctor
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showMessage(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                showMessage('Error creating doctor', 'error');
-                console.error('Error:', error);
-            });
-        });
-    }
-    
-    // Edit doctor form submission
-    const editDoctorForm = document.getElementById('editDoctorForm');
-    if (editDoctorForm) {
-        editDoctorForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const data = {
-                first_name: formData.get('first_name').trim(),
-                last_name: formData.get('last_name').trim(),
-                procedure: formData.get('procedure').trim(),
-                price: formData.get('price')
-            };
-            
-            fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace('0', currentDoctorId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showMessage(data.message, 'success');
-                    // Update the table row
-                    const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
-                    if (row) {
-                        row.cells[1].textContent = data.doctor.first_name + ' ' + data.doctor.last_name;
-                        row.cells[2].textContent = data.doctor.procedure;
-                        row.cells[3].textContent = data.doctor.price + ' sum';
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        showMessage(data.message, "success");
+                        // Remove the row from the table
+                        const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
+                        if (row) row.remove();
+                        closeDeleteModal();
+                    } else {
+                        showMessage(data.message, "error");
                     }
-                    closeEditModal();
-                } else {
-                    showMessage(data.message, 'error');
-                }
-            })
-            .catch(error => {
-                showMessage('Error updating doctor', 'error');
-                console.error('Error:', error);
-            });
-        });
-    }
-    
-    // Close modals when clicking outside
-    window.onclick = function(event) {
-        const editModal = document.getElementById('editDoctorModal');
-        const deleteModal = document.getElementById('deleteDoctorModal');
-        
-        if (event.target === editModal) {
-            closeEditModal();
-        }
-        if (event.target === deleteModal) {
-            closeDeleteModal();
+                })
+                .catch((error) => {
+                    showMessage("Error deleting doctor", "error");
+                    console.error("Error:", error);
+                });
         }
     }
-});
 
-// Utility Functions
-function showMessage(message, type) {
-    console.log('Showing message:', message, 'Type:', type);
-    const messageDiv = document.getElementById('message');
-    if (!messageDiv) {
-        console.error('Message div not found');
-        return;
-    }
-    
-    messageDiv.textContent = message;
-    messageDiv.className = `message ${type}`;
-    messageDiv.style.display = 'block';
-    
-    // Add show class for animation
-    setTimeout(() => {
-        messageDiv.classList.add('show');
-    }, 10);
-    
-    setTimeout(() => {
-        messageDiv.classList.remove('show');
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, 300);
-    }, 5000);
-}
+    // Add doctor form submission
+    document.addEventListener("DOMContentLoaded", function () {
+        const addDoctorForm = document.getElementById("addDoctorForm");
+        if (addDoctorForm) {
+            addDoctorForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+                const data = {
+                    first_name: formData.get("first_name").trim(),
+                    last_name: formData.get("last_name").trim(),
+                    procedure: formData.get("procedure").trim(),
+                    price: parseFloat(formData.get("price")) || 0.0,
+                };
+
+                // Validate required fields
+                if (!data.first_name || !data.last_name) {
+                    showMessage("First name and last name are required", "error");
+                    return;
+                }
+
+                if (data.price <= 0) {
+                    showMessage("Price must be greater than 0", "error");
+                    return;
+                }
+
+                fetch('{% url "medical_access:create_doctor" %}', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    },
+                    body: JSON.stringify(data),
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log("Doctor creation response:", data);
+                        if (data.success) {
+                            showMessage(data.message, "success");
+                            // Clear the form
+                            const form = document.getElementById("addDoctorForm");
+                            if (form) {
+                                form.reset();
+                            }
+                            // Reload page to show new doctor
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showMessage(data.message, "error");
+                        }
+                    })
+                    .catch((error) => {
+                        showMessage("Error creating doctor", "error");
+                        console.error("Error:", error);
+                    });
+            });
+        }
+
+        // Edit doctor form submission
+        const editDoctorForm = document.getElementById("editDoctorForm");
+        if (editDoctorForm) {
+            editDoctorForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+                const data = {
+                    first_name: formData.get("first_name").trim(),
+                    last_name: formData.get("last_name").trim(),
+                    procedure: formData.get("procedure").trim(),
+                    price: formData.get("price"),
+                };
+
+                fetch(`{% url 'medical_access:update_doctor' 0 %}`.replace("0", currentDoctorId), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    },
+                    body: JSON.stringify(data),
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            showMessage(data.message, "success");
+                            // Update the table row
+                            const row = document.querySelector(`tr[data-doctor-id="${currentDoctorId}"]`);
+                            if (row) {
+                                row.cells[1].textContent = data.doctor.first_name + " " + data.doctor.last_name;
+                                row.cells[2].textContent = data.doctor.procedure;
+                                row.cells[3].textContent = data.doctor.price + " sum";
+                            }
+                            closeEditModal();
+                        } else {
+                            showMessage(data.message, "error");
+                        }
+                    })
+                    .catch((error) => {
+                        showMessage("Error updating doctor", "error");
+                        console.error("Error:", error);
+                    });
+            });
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function (event) {
+            const editModal = document.getElementById("editDoctorModal");
+            const deleteModal = document.getElementById("deleteDoctorModal");
+
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+            if (event.target === deleteModal) {
+                closeDeleteModal();
+            }
+        };
+    });
+
+    // Utility Functions - Use the global showMessage from main.js
+    // The showMessage function is already defined in main.js and uses the modern toast system
 </script>
 {% endblock %}

@@ -162,15 +162,7 @@ function getCookie(name) {
     return cookieValue;
 }
 
-function showMessage(message, type) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = message;
-    messageDiv.className = `message message--${type}`;
-    messageDiv.style.display = 'block';
-    
-    setTimeout(() => {
-        messageDiv.style.display = 'none';
-    }, 5000);
-}
+// Utility Functions - Use the global showMessage from main.js
+// The showMessage function is already defined in main.js and uses the modern toast system
 </script>
 {% endblock %}

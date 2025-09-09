@@ -144,7 +144,6 @@
     </div>
 </div>
 
-<div id="message" class="message" style="display: none;"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -320,16 +319,8 @@ function exportCSV() {
 }
 
 // Utility Functions
-function showMessage(message, type) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = message;
-    messageDiv.className = `message ${type}`;
-    messageDiv.style.display = 'block';
-    
-    setTimeout(() => {
-        messageDiv.style.display = 'none';
-    }, 5000);
-}
+// Utility Functions - Use the global showMessage from main.js
+// The showMessage function is already defined in main.js and uses the modern toast system
 
 // Hotkeys
 document.addEventListener('keydown', function(e) {
