@@ -24,8 +24,17 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Get server IP
-SERVER_IP=$(hostname -I | awk '{print $1}')
+# Get server IP (works on both macOS and Linux)
+if command -v hostname >/dev/null 2>&1 && hostname -I >/dev/null 2>&1; then
+    # Linux
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+elif command -v ifconfig >/dev/null 2>&1; then
+    # macOS
+    SERVER_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+else
+    # Fallback
+    SERVER_IP="localhost"
+fi
 print_status "Testing PayVerify on IP: $SERVER_IP"
 
 # Test 1: Check containers

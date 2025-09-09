@@ -24,13 +24,28 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Get the server IP automatically
-SERVER_IP=$(hostname -I | awk '{print $1}')
+# Get the server IP automatically (works on both macOS and Linux)
+if command -v hostname >/dev/null 2>&1 && hostname -I >/dev/null 2>&1; then
+    # Linux
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+elif command -v ifconfig >/dev/null 2>&1; then
+    # macOS
+    SERVER_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}')
+else
+    # Fallback
+    SERVER_IP="localhost"
+fi
 print_status "Detected server IP: $SERVER_IP"
 
 # Update the environment file with the detected IP
 print_status "Updating environment file with IP: $SERVER_IP"
-sed -i "s/ALLOWED_HOSTS=.*/ALLOWED_HOSTS=$SERVER_IP,192.168.1.108,192.168.1.100,localhost,127.0.0.1,0.0.0.0,*/" env.simple
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/ALLOWED_HOSTS=.*/ALLOWED_HOSTS=$SERVER_IP,192.168.1.108,192.168.1.100,localhost,127.0.0.1,0.0.0.0,*/" env.simple
+else
+    # Linux
+    sed -i "s/ALLOWED_HOSTS=.*/ALLOWED_HOSTS=$SERVER_IP,192.168.1.108,192.168.1.100,localhost,127.0.0.1,0.0.0.0,*/" env.simple
+fi
 
 # Stop any existing containers
 print_status "Stopping existing containers..."
