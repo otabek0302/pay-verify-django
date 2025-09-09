@@ -65,6 +65,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8000:80"  # Allow access via port 8000 for terminal compatibility
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
