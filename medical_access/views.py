@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.core.paginator import Paginator
 from django.contrib import messages
 import json
@@ -809,7 +809,7 @@ def delete_appointment(request, appointment_id):
         try:
             appointment = get_object_or_404(Appointment, id=appointment_id)
             
-            # Get patient info before deletion for logging
+            # Get patient info before deletion
             patient = appointment.patient
             patient_name = patient.full_name
             
@@ -848,6 +848,7 @@ def admin_terminal_health(request, pk: int):
 def admin_terminal_open(request, pk: int):
     """Admin view for opening terminal door"""
     t = get_object_or_404(Terminal, pk=pk)
+    
     res = open_door(t, door_no=1)
     
     if res.get("ok"):
@@ -926,6 +927,12 @@ def validate_qr_and_open_door(request, terminal_id: int):
                 }
             })
         
+        # Update appointment status (terminal opens door itself)
+        appointment.status = new_status
+        if new_status == 'enter':
+            appointment.used_at = now
+        appointment.save()
+        
         # Open door
         result = open_door(terminal, door_no=1)
         if result.get('ok'):
@@ -952,14 +959,15 @@ def validate_qr_and_open_door(request, terminal_id: int):
                 "appointment": {
                     "id": appointment.id,
                     "patient": appointment.patient.full_name,
-                    "doctor": appointment.doctor.full_name
+                    "doctor": appointment.doctor.full_name,
+                    "status": appointment.status
                 }
             })
             
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
-# Simple scan event logging API (console only)
+# Simple scan event logging API
 @csrf_exempt
 @require_POST
 def log_scan_event(request):
@@ -996,10 +1004,9 @@ def log_scan_event(request):
             else:
                 scan_type = 'qr'
         
-        # Log scan event (using Django logging instead of print)
+        # Log scan event
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"Scan event: Terminal {terminal_ip} ({terminal_mode}) - QR: {qr_code} - Type: {scan_type}")
         
         # Check if it's a valid appointment (optional validation)
         is_valid = False
@@ -1074,13 +1081,13 @@ def terminal_open_door_api(request, terminal_id):
         else:
             return JsonResponse({
                 'success': False,
-                'message': f'Failed to open door: {result.get("error", "Unknown error")}'
+                'message': f'Failed to open door on {terminal.terminal_name}: {result.get("error", "Unknown error")}'
             }, status=500)
             
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'message': f'Error opening door: {str(e)}'
+            'message': f'Error: {str(e)}'
         }, status=500)
 
 # Get recent scans from terminal

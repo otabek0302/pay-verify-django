@@ -22,6 +22,8 @@ services:
       dockerfile: Dockerfile
     container_name: payverify_web_prod
     restart: unless-stopped
+    env_file:
+      - env.simple
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -31,7 +33,6 @@ services:
       - USE_POSTGRES=True
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - PAYVERIFY_TERMINAL_TIMEOUT=${PAYVERIFY_TERMINAL_TIMEOUT}
     depends_on:
       db:
@@ -43,6 +44,8 @@ services:
       python create_superuser.py &&
       gunicorn controller.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
       "
+    ports:
+      - "8000:8000"
     expose:
       - "8000"
     volumes:

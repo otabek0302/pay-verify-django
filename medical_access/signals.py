@@ -12,4 +12,3 @@ def on_appt_created(sender, instance: Appointment, created, **kwargs):
     # Verification happens via remote API calls only
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"Remote-Only Mode: Appointment #{instance.id} created with QR: {instance.qr_code}")

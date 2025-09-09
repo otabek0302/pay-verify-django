@@ -55,15 +55,18 @@ urlpatterns = [
     # QR validation and door control
     path('terminals/<int:terminal_id>/validate-qr/', views.validate_qr_and_open_door, name='validate_qr_and_open_door'),
     
-    # Scan event logging (console only)
+    # Scan event logging
     path('scan-events/', views.log_scan_event, name='log_scan_event'),
     path('terminals/<str:terminal_ip>/mode/', views.get_terminal_mode_api, name='get_terminal_mode'),
     
     # Get recent scans from terminal
     path('terminals/<int:pk>/last-scans/', views.last_scans, name='terminal_last_scans'),
     
+    # Hikvision remote verification endpoint (removed - using hik_event_receiver instead)
+    
     # Hikvision event push receiver
     path('hik/events/', hik_event_receiver, name='hik_events'),
+    path('hik-event-receiver/', hik_event_receiver, name='hik_event_receiver_old'),  # Support old URL
     
     # DMED Platform Integration APIs
     path('dmed/appointments/', dmed_create_appointment, name='dmed_create_appointment'),

@@ -93,6 +93,99 @@ def remote_only_verify(qr_code, terminal_mode, terminal_ip):
     return is_valid, appointment, message
 
 @csrf_exempt
+def hik_verify_receiver(request):
+    """
+    Hikvision remote verification endpoint - FAST RESPONSE VERSION.
+    Terminal sends QR code here to get ALLOW/DENY decision.
+    Returns immediate response to prevent timeout.
+    """
+    import time
+    t0 = time.time()
+    
+    try:
+        # Get terminal IP from request
+        terminal_ip = request.META.get("REMOTE_ADDR")
+        
+        # Parse the request body to get QR code
+        body = request.body.decode("utf-8", errors="ignore")
+        
+        logger = logging.getLogger(__name__)
+        
+        # Look up terminal by IP (for testing, also check localhost)
+        term = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
+        if not term and terminal_ip in ['127.0.0.1', 'localhost']:
+            # For testing from localhost, use Terminal 1
+            term = Terminal.objects.filter(terminal_name="Terminal 1", active=True).first()
+        
+        if not term:
+            logger.warning(f"Terminal not found for IP: {terminal_ip}")
+            return JsonResponse({"decision": "deny", "reason": "terminal_not_found"}, status=200)
+        
+        # Parse multipart body to find verification events
+        qr_code = None
+        for part in body.split("\n--"):
+            if "{" in part:
+                js = part[part.find("{"):]
+                try:
+                    data = json.loads(js)
+                except Exception:
+                    continue
+                    
+                ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
+                
+                # Check if this is a heartbeat event
+                if ev.get("eventType") == "heartBeat":
+                    return JsonResponse({"status": "heartbeat"}, status=200)
+                
+                # Check if this is a verification event
+                if ev.get("eventType") == "access" or ev.get("major") == 5:
+                    # Try multiple possible field names for QR code data
+                    qr_code = (ev.get("cardNo") or 
+                              ev.get("credentialNo") or 
+                              ev.get("qrCode") or
+                              ev.get("qrData") or
+                              ev.get("qr_code") or
+                              ev.get("qrCodeData") or
+                              ev.get("qrContent") or
+                              ev.get("data") or
+                              ev.get("content") or
+                              ev.get("cardNumber") or
+                              ev.get("card_number") or
+                              ev.get("qr") or
+                              ev.get("code") or
+                              ev.get("payload"))
+                    
+                    if qr_code:
+                        break
+        
+        if not qr_code:
+            logger.warning(f"No QR code found in request from {terminal_ip}")
+            # For testing: return ALLOW even without QR code to test the flow
+            resp = {"decision": "allow", "reason": "test-allow-no-qr"}
+            duration = (time.time() - t0) * 1000
+            return JsonResponse(resp, status=200)
+        
+        
+        # QUICK ALLOW for testing: respond immediately
+        resp = {
+            "decision": "allow",
+            "reason": "test-allow",
+            "qr_code": qr_code
+        }
+        duration = (time.time() - t0) * 1000
+        logger.info(f"[VERIFY OUT] {int(duration)}ms {resp}")
+        
+        return JsonResponse(resp, status=200)
+            
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Verification error: {e}")
+        resp = {"decision": "deny", "reason": "error", "error": str(e)}
+        duration = (time.time() - t0) * 1000
+        logger.info(f"[VERIFY OUT] {int(duration)}ms {resp}")
+        return JsonResponse(resp, status=200)
+
+@csrf_exempt
 def hik_event_receiver(request):
     """
     Remote verification receiver for Hikvision terminals.
@@ -127,49 +220,88 @@ def hik_event_receiver(request):
                     continue
                     
                 ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
-                
-                # Debug: Log all available fields to see what the terminal is sending
-                logger = logging.getLogger(__name__)
-                logger.info(f"Terminal event data: {ev}")
-                
-                # Try multiple possible field names for QR code data
-                card = (ev.get("cardNo") or 
-                       ev.get("credentialNo") or 
-                       ev.get("qrCode") or
-                       ev.get("qrData") or
-                       ev.get("qr_code") or
-                       ev.get("qrCodeData") or
-                       ev.get("qrContent") or
-                       ev.get("data") or
-                       ev.get("content"))
-                
-                verify = (ev.get("verifyMode") or ev.get("currentVerifyMode") or "").lower()
+                card = ev.get("cardNo") or ev.get("credentialNo") or ev.get("qrCode")
                 major = ev.get("major") or ev.get("majorEventType")
-                time_str = ev.get("time") or ev.get("dateTime")
                 
                 # Process access verification events (major=5)
                 if major == 5 and card:
-                    # Remote-Only verification: Check appointment validity using QR code
-                    is_valid, appointment, message = remote_only_verify(card, mode, terminal_ip)
+                    logger = logging.getLogger(__name__)
                     
-                    if is_valid:
-                        # Open door on the terminal
-                        try:
-                            open_door(term, door_no=1)
-                        except Exception:
-                            pass  # Door open errors are logged elsewhere
-                    
-                    events.append({
-                        "ip": terminal_ip,
-                        "name": terminal_name,
-                        "mode": mode,
-                        "card": card,
-                        "verify": verify,
-                        "result": "granted" if is_valid else "denied",
-                        "message": message,
-                        "appointment_id": appointment.id if appointment else None,
-                        "time": time_str
-                    })
+                    # FAST RESPONSE: Check appointment status immediately
+                    try:
+                        appointment = Appointment.objects.filter(qr_code=card).first()
+                        if not appointment:
+                            logger.warning(f"No appointment found for QR: {card}")
+                            return HttpResponse("OK", status=200)
+                        
+                        # Check current status and determine action
+                        current_status = appointment.status
+                        terminal_mode = term.mode.lower()
+                        
+                        
+                        # Determine if access should be granted and what message to show
+                        access_granted = False
+                        status_message = ""
+                        
+                        if current_status == 'active':
+                            # First scan - Entry
+                            appointment.status = 'enter'
+                            appointment.used_at = timezone.now()
+                            appointment.save()
+                            access_granted = True
+                            status_message = "Welcome! Entry granted"
+                            
+                        elif current_status == 'enter' and terminal_mode in ['exit', 'both']:
+                            # Second scan - Exit
+                            appointment.status = 'leave'
+                            appointment.save()
+                            access_granted = True
+                            status_message = "Goodbye! Exit granted"
+                            
+                        elif current_status == 'leave':
+                            # Already left
+                            access_granted = False
+                            status_message = "Already left - Access denied"
+                            logger.warning(f"Already left: {appointment.patient.full_name}")
+                            
+                        else:
+                            # Invalid status for this terminal mode
+                            access_granted = False
+                            status_message = "Invalid status - Access denied"
+                            logger.warning(f"Invalid status {current_status} for mode {terminal_mode}")
+                        
+                        # Open door immediately if access granted
+                        if access_granted:
+                            try:
+                                open_door(term, door_no=1)
+                            except Exception as e:
+                                logger.error(f"Door open failed: {e}")
+                        
+                        # Return Hikvision XML format to prevent "Authentication Failed"
+                        if access_granted:
+                            # ALLOW response in Hikvision XML format
+                            response_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<ResponseStatus>
+    <requestURL>/ISAPI/AccessControl/RemoteControl/door/1</requestURL>
+    <statusCode>1</statusCode>
+    <statusString>OK</statusString>
+    <subStatusCode>ok</subStatusCode>
+</ResponseStatus>"""
+                            return HttpResponse(response_xml, content_type="application/xml")
+                        else:
+                            # DENY response in Hikvision XML format
+                            response_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<ResponseStatus>
+    <requestURL>/ISAPI/AccessControl/RemoteControl/door/1</requestURL>
+    <statusCode>4</statusCode>
+    <statusString>Forbidden</statusString>
+    <subStatusCode>forbidden</subStatusCode>
+</ResponseStatus>"""
+                            return HttpResponse(response_xml, content_type="application/xml")
+                        
+                    except Exception as e:
+                        logger.error(f"Verification error: {e}")
+                        return HttpResponse("OK", status=200)
         
         if not events:
             # No verification events found, return OK
@@ -331,12 +463,17 @@ def dmed_create_appointment(request):
             )
         
         # Get or create doctor
+        # Split doctor name into first and last name
+        doctor_name_parts = doctor_name.split() if doctor_name else ['', '']
+        first_name = doctor_name_parts[0] if doctor_name_parts else ''
+        last_name = ' '.join(doctor_name_parts[1:]) if len(doctor_name_parts) > 1 else ''
+        
         doctor, created = Doctor.objects.get_or_create(
-            name=doctor_name,
+            first_name=first_name,
+            last_name=last_name,
             defaults={
-                'specialty': doctor_specialty,
-                'phone': '',
-                'email': ''
+                'procedure': doctor_specialty,
+                'price': 0.00
             }
         )
         
@@ -373,7 +510,6 @@ def dmed_create_appointment(request):
         qr_sent = send_qr_to_dmed(dmed_appointment_id, qr_code, appointment.id)
         
         logger = logging.getLogger(__name__)
-        logger.info(f"DMED appointment created: {appointment.id} for patient {patient.full_name}")
         
         return JsonResponse({
             'success': True,
@@ -415,7 +551,6 @@ def send_qr_to_dmed(dmed_appointment_id, qr_code, appointment_id):
         
         if response.status_code == 200:
             logger = logging.getLogger(__name__)
-            logger.info(f"QR code sent to DMED successfully for appointment {appointment_id}")
             return True
         else:
             logger = logging.getLogger(__name__)
