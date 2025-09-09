@@ -1,0 +1,215 @@
+/* === Dashboard Page Styles === */
+
+/* Dashboard Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.dashboard-title h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.dashboard-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 400;
+}
+
+.dashboard-period-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.period-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.period-select {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 140px;
+}
+
+.period-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.period-select:hover {
+    border-color: var(--primary-color);
+}
+
+/* Statistics Cards Section */
+.dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.dashboard-stat-card {
+    background: var(--surface);
+    padding: 32px 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.dashboard-stat-card-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.dashboard-stat-card-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+/* Recent Appointments Section */
+.dashboard-appointments {
+    margin-top: 12px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+/* Table Styles */
+.appointments-body {
+    width: 100%;
+    padding: 24px 24px 24px 24px;
+}
+
+.appointments-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.table-head {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.table-header {
+    padding: 16px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.8px;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.table-cell {
+    padding: 16px 12px;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.table-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.table-link:hover {
+    color: var(--primary-dark);
+}
+
+/* Status Badges */
+/* Status badges now defined globally in main.css */
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .dashboard-stat-card {
+        padding: 24px 20px;
+    }
+
+    .dashboard-stat-card-value {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .dashboard-title h1 {
+        font-size: 24px;
+    }
+
+    .dashboard-period-selector {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .period-select {
+        min-width: 120px;
+    }
+
+    .dashboard-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .dashboard-stat-card {
+        padding: 20px 16px;
+    }
+
+    .dashboard-stat-card-value {
+        font-size: 24px;
+    }
+
+    .appointments-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .appointments-body {
+        padding: 0 16px 16px 16px;
+        overflow-x: auto;
+    }
+
+    .appointments-table {
+        min-width: 600px;
+    }
+
+    .table-header,
+    .table-cell {
+        padding: 12px 8px;
+    }
+}

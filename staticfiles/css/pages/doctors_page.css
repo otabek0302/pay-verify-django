@@ -1,0 +1,417 @@
+/* === Doctors Page Styles === */
+
+.doctors-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Page Header */
+.doctors-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.doctors-page-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.doctors-page-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.doctors-page-btn--secondary {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.doctors-page-btn--secondary:hover {
+    background: #5a6268;
+}
+
+/* Form Section */
+.doctors-form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.doctors-form-header {
+    padding: 20px 24px 0 24px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.doctors-form-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+}
+
+.doctors-form {
+    padding: 20px;
+}
+
+.doctors-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.doctors-form-group {
+    margin-bottom: 12px;
+}
+
+.doctors-form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.doctors-form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: var(--text-primary);
+    background-color: var(--surface);
+    transition: all 0.3s ease;
+}
+
+.doctors-form-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
+}
+
+.doctors-form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+
+.doctors-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.doctors-btn--primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.doctors-btn--primary:hover {
+    background: var(--primary-dark);
+}
+
+.doctors-btn--secondary {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.doctors-btn--secondary:hover {
+    background: #5a6268;
+}
+
+.doctors-btn--danger {
+    background: var(--error-color);
+    color: white;
+}
+
+.doctors-btn--danger:hover {
+    background: #dc2626;
+}
+
+
+
+/* Table Section */
+.doctors-table-section {
+    padding: 16px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.doctors-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.doctors-table-head {
+    padding: 16px 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.doctors-table-header {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.doctors-table-cell {
+    padding: 16px 12px;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.doctors-table-cell--empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+}
+
+.doctors-table-cell--name {
+    font-weight: 500;
+}
+
+.doctors-table-cell--username {
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.doctors-table-cell--phone {
+    font-size: 13px;
+}
+
+.doctors-no-actions {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 12px;
+}
+
+.doctors-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.doctors-action-btn {
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.doctors-action-btn--edit {
+    background: var(--primary-color);
+    color: white;
+}
+
+.doctors-action-btn--edit:hover {
+    background: var(--primary-dark);
+}
+
+.doctors-action-btn--delete {
+    background: var(--error-color);
+    color: white;
+}
+
+.doctors-action-btn--delete:hover {
+    background: #dc2626;
+}
+
+/* Modal Styles */
+.doctors-modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.doctors-modal-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 0 auto;
+    position: relative;
+}
+
+.doctors-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.doctors-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.doctors-modal-close {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.doctors-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.doctors-modal-form {
+    padding: 24px;
+}
+
+.doctors-modal-form-group {
+    margin-bottom: 16px;
+}
+
+.doctors-modal-form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.doctors-modal-form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: var(--text-primary);
+    background-color: var(--surface);
+    transition: all 0.3s ease;
+}
+
+.doctors-modal-form-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
+}
+
+.doctors-modal-form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.doctors-modal-body {
+    padding: 24px;
+}
+
+.doctors-modal-warning {
+    color: var(--error-color);
+    font-weight: 500;
+    margin-top: 8px;
+}
+
+.doctors-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-top: 1px solid var(--border-light);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .doctors-page-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .doctors-form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .doctors-form-actions {
+        flex-direction: column;
+    }
+
+    .doctors-table-section {
+        overflow-x: auto;
+    }
+
+    .doctors-table {
+        min-width: 600px;
+    }
+
+    .doctors-modal-content {
+        width: 95%;
+        margin: 20px;
+    }
+}
+
+/* Procedure Badges */
+.doctors-procedure-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--primary-color);
+    color: var(--text-primary);
+    border-radius: var(--radius);
+    font-size: 11px;
+    font-weight: 500;
+    margin: 2px 0;
+}
+
+.doctors-no-procedures {
+    color: var(--text-secondary);
+    font-style: italic;
+}
