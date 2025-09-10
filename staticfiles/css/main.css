@@ -126,7 +126,45 @@
     opacity: 0;
 }
 
-/* === Legacy Message Styles Removed - Now Using Toast System Only === */
+/* === Message Styles (for backward compatibility) === */
+.message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(100%);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10000;
+    display: none;
+}
+
+.message.show {
+    transform: translateX(0);
+}
+
+.message.success {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.message.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.message.info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.message.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
 
 /* === CSS Variables - Design System === */
 :root {
@@ -570,6 +608,53 @@ select:focus-visible {
 .status-badge--info {
     background-color: rgba(0, 123, 255, 0.1);
     color: var(--primary-color);
+}
+
+/* === QR Status Badge Standards === */
+.qr-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.qr-status-badge--active {
+    background-color: rgba(40, 167, 69, 0.1);
+    color: var(--success-color);
+}
+
+.qr-status-badge--entered {
+    background-color: rgba(0, 123, 255, 0.1);
+    color: var(--primary-color);
+}
+
+.qr-status-badge--left {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: var(--text-muted);
+}
+
+.qr-status-badge--expired {
+    background-color: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.qr-status-badge--none {
+    background-color: rgba(108, 117, 125, 0.05);
+    color: #6c757d;
+    border: 1px solid #e9ecef;
+}
+
+.qr-status-badge i {
+    font-size: 10px;
 }
 
 /* === Global Button Standards === */

@@ -1,4 +1,6 @@
-{% extends 'medical_access/base.html' %} {% load static %} {% block title %}PayVerify - Login{% endblock %} {% block auth_content %}
+{% extends 'medical_access/base.html' %} {% load static %} {% block title %}PayVerify - Login{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/login_page.css' %}" />
+{% endblock %} {% block auth_content %}
 <div class="login-page-left-side"></div>
 <div class="login-page-right-side">
     <div class="login-page-right-side-container">

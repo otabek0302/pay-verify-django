@@ -1,7 +1,10 @@
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.core.validators import MinValueValidator, RegexValidator
 from django.utils import timezone
+from django.core.validators import MinValueValidator, RegexValidator
+from django.contrib.auth.models import AbstractUser
+import secrets
+import string
+import random
 
 class User(AbstractUser):
     class Role(models.TextChoices):
@@ -10,11 +13,7 @@ class User(AbstractUser):
         RECEPTIONIST = "receptionist", "Receptionist"
     
     role = models.CharField(max_length=20, choices=Role.choices, blank=True)
-    phone = models.CharField(
-        max_length=15, 
-        blank=True,
-        validators=[RegexValidator(regex=r'^\+?1?\d{9,15}$', message='Phone number must be entered in the format: +999999999. Up to 15 digits allowed.')]
-    )
+    phone = models.CharField(max_length=15, blank=True, validators=[RegexValidator(regex=r'^\+?1?\d{9,15}$', message='Phone number must be entered in the format: +999999999. Up to 15 digits allowed.')])
     
     class Meta:
         db_table = 'users_user'
@@ -30,8 +29,8 @@ class User(AbstractUser):
         return f"{self.first_name} {self.last_name}".strip()
 
 class Doctor(models.Model):
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50, default='')
+    last_name = models.CharField(max_length=50, default='')
     procedure = models.CharField(max_length=160, default='General Consultation')
     price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, validators=[MinValueValidator(0.01, 'Price must be greater than 0')])
     created_at = models.DateTimeField(auto_now_add=True)
@@ -50,10 +49,10 @@ class Doctor(models.Model):
         return f"{self.first_name} {self.last_name}".strip()
 
 class Patient(models.Model):
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
-    passport_series = models.CharField(max_length=10, blank=True, null=True)
-    passport_number = models.CharField(max_length=20, blank=True, null=True)
+    first_name = models.CharField(max_length=50, default='')
+    last_name = models.CharField(max_length=50, default='')
+    passport_series = models.CharField(max_length=10, blank=True, null=True, default='')
+    passport_number = models.CharField(max_length=20, blank=True, null=True, default='')
     phone = models.CharField(
         max_length=20, 
         blank=True, 
@@ -82,64 +81,78 @@ class Patient(models.Model):
             return f"{self.full_name} ({self.phone})"
         return self.full_name
 
-class Appointment(models.Model):
-    class Status(models.TextChoices):
-        ACTIVE = 'active', 'Active'
-        ENTER = 'enter', 'Enter'
-        LEAVE = 'leave', 'Leave'
-        USED = 'used', 'Used'
-        EXPIRED = 'expired', 'Expired'
-    
-    patient = models.ForeignKey(Patient, on_delete=models.DO_NOTHING, related_name='appointments')
-    doctor = models.ForeignKey(Doctor, on_delete=models.PROTECT, related_name='appointments')
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
-    
-    # QR Code and validity fields (Simple 12-character codes)
-    valid_from = models.DateTimeField(null=True, blank=True)
-    valid_till = models.DateTimeField(null=True, blank=True)
-    qr_code = models.CharField(max_length=12, unique=True, null=True, blank=True)  # Simple 12-character QR code
-    used_at = models.DateTimeField(null=True, blank=True)  # When QR was used
+class Integration(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Integration name (e.g., DMED, RemoteJobs)")
+    api_url = models.URLField(blank=True, null=True, help_text="Base API endpoint if needed")
+    api_token = models.CharField(max_length=255, unique=True, editable=False, help_text="Auto-generated secure token")
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this integration")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
+        verbose_name = 'Integration'
+        verbose_name_plural = 'Integrations'
+        ordering = ['name']
+    
+    def save(self, *args, **kwargs):
+        if not self.api_token:
+            self.api_token = secrets.token_hex(32)  # 64-char secure key
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.name} ({'active' if self.is_active else 'inactive'})"
+
+class Appointment(models.Model):
+    
+    patient = models.ForeignKey("Patient", on_delete=models.DO_NOTHING, related_name="appointments")
+    doctor = models.ForeignKey("Doctor", on_delete=models.DO_NOTHING, related_name="appointments")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
         verbose_name = 'Appointment'
         verbose_name_plural = 'Appointments'
         ordering = ['-created_at']
-    
+
     def __str__(self):
-        return f"{self.patient.full_name} - {self.doctor.procedure} on {self.created_at.date()}"
-    
+        return f"{self.patient.full_name} - {self.doctor.procedure}"
+
+class QRCode(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        ENTERED = 'entered', 'Entered'
+        LEFT = 'left', 'Left'
+        EXPIRED = 'expired', 'Expired'
+
+    appointment = models.OneToOneField("Appointment", on_delete=models.CASCADE, related_name="qr_code")
+    code = models.CharField(max_length=12, unique=True, db_index=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+
+    revoked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "QR Code"
+        verbose_name_plural = "QR Codes"
+        ordering = ["-created_at"]
+
     def save(self, *args, **kwargs):
-        # Auto-generate simple 12-character QR code if not provided
-        if not self.qr_code:
-            import random
-            import string
-            # Generate 12-character alphanumeric code (uppercase letters and numbers)
-            characters = string.ascii_uppercase + string.digits
-            self.qr_code = ''.join(random.choice(characters) for _ in range(12))
-            
+        if not self.code:
+            chars = string.ascii_uppercase + string.digits
+            self.code = ''.join(random.choice(chars) for _ in range(12))
         super().save(*args, **kwargs)
-    
+
+    def __str__(self):
+        return f"QR {self.code} for Appointment {self.appointment.id}"
+
     @property
     def is_valid(self):
         now = timezone.now()
-        return (
-            self.status == self.Status.ACTIVE and
-            self.valid_from and self.valid_till and
-            self.valid_from <= now <= self.valid_till
-        )
+        return (not self.revoked) and self.expires_at > now and self.status in [self.Status.ACTIVE, self.Status.ENTERED]
     
-    def mark_as_used(self):
-        self.status = self.Status.ENTER
-        self.used_at = timezone.now()
-        self.save()
-    
-    def mark_as_leave(self):
-        self.status = self.Status.LEAVE
-        self.save()
-
 class Terminal(models.Model):
     class Mode(models.TextChoices):
         ENTRY = 'entry', 'Entry'

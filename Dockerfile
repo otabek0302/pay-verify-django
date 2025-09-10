@@ -1,31 +1,27 @@
-FROM python:3.12-slim
+# Use official lightweight Python image
+FROM python:3.11-slim
 
-# System deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl && \
-    rm -rf /var/lib/apt/lists/*
+# Set environment vars
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
+# Create working dir
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY requirements.txt /app/
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc netcat-traditional curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
+# Install Python deps
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
-COPY . /app
+# Copy project
+COPY . .
 
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+# Entrypoint script (waits for db, runs migrations, starts Gunicorn)
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Switch to non-root user
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+ENTRYPOINT ["/entrypoint.sh"]

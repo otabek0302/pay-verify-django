@@ -4,13 +4,13 @@ services:
     container_name: payverify_db_prod
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-payverify}
+      POSTGRES_USER: ${POSTGRES_USER:-payverify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payverify123}
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payverify} -d ${POSTGRES_DB:-payverify}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -25,15 +25,15 @@ services:
     env_file:
       - env.simple
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-payverify}
+      - POSTGRES_USER=${POSTGRES_USER:-payverify}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-payverify123}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - USE_POSTGRES=True
-      - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=${DEBUG}
-      - PAYVERIFY_TERMINAL_TIMEOUT=${PAYVERIFY_TERMINAL_TIMEOUT}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - DEBUG=${DEBUG:-False}
+      - PAYVERIFY_TERMINAL_TIMEOUT=${PAYVERIFY_TERMINAL_TIMEOUT:-30}
     depends_on:
       db:
         condition: service_healthy
@@ -41,11 +41,17 @@ services:
       sh -c "
       python manage.py migrate &&
       python manage.py collectstatic --noinput &&
-      python create_superuser.py &&
+      python manage.py shell -c \"
+      from django.contrib.auth import get_user_model
+      User = get_user_model()
+      if not User.objects.filter(username='admin').exists():
+          User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
+          print('Superuser created: admin/admin123')
+      else:
+          print('Superuser already exists')
+      \" &&
       gunicorn controller.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
       "
-    ports:
-      - "8000:8000"
     expose:
       - "8000"
     volumes:

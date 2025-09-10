@@ -13,30 +13,21 @@ class MedicalAccessAdminSite(admin.AdminSite):
     index_title = "Super Admin Dashboard"
     
     def has_permission(self, request):
-        """
-        Allow super admin users or Django superusers to access the Django admin
-        """
+        """Allow only super admin users to access the Django admin site"""
         return (
             request.user.is_authenticated and 
             request.user.is_active and 
-            (
-                request.user.is_superuser or  # Django superuser
-                (hasattr(request.user, 'role') and request.user.role == 'super_admin')  # Custom super admin
-            )
+            (hasattr(request.user, 'role') and request.user.role == 'super_admin')
         )
     
     def login(self, request, extra_context=None):
-        """
-        Redirect to custom login if user doesn't have super admin role
-        """
+        """ Redirect to custom login if user doesn't have super admin role """
         if not self.has_permission(request):
             return redirect_to_login(request.get_full_path(), reverse('medical_access:login'))
         return super().login(request, extra_context)
     
     def index(self, request, extra_context=None):
-        """
-        Redirect to custom login if user doesn't have super admin role
-        """
+        """Redirect to custom login if user doesn't have super admin role"""
         if not self.has_permission(request):
             return redirect_to_login(request.get_full_path(), reverse('medical_access:login'))
         return super().index(request, extra_context)
@@ -103,26 +94,34 @@ class PatientAdmin(admin.ModelAdmin):
 
 # Appointment Admin
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'doctor', 'status', 'qr_code', 'valid_from', 'valid_till', 'created_at')
-    list_filter = ('status', 'created_at')
-    search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name', 'qr_code')
+    list_display = ('patient', 'doctor', 'qr_code_status', 'qr_code_expires', 'created_at')
+    list_filter = ('qr_code__status', 'created_at')
+    search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name')
     ordering = ('-created_at',)
-    readonly_fields = ('qr_code', 'used_at', 'created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at')
     date_hierarchy = 'created_at'
-    # actions = []  # No card management actions needed for Remote-Only Mode
+    actions = []
     
     fieldsets = (
         ('Appointment Details', {
-            'fields': ('patient', 'doctor', 'status')
+            'fields': ('patient', 'doctor', 'created_by')
         }),
-        ('QR Code & Access', {
-            'fields': ('qr_code', 'valid_from', 'valid_till', 'used_at')
+        ('QR Code', {
+            'fields': ('qr_code',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def qr_code_status(self, obj):
+        return obj.qr_code.status if hasattr(obj, 'qr_code') else 'No QR Code'
+    qr_code_status.short_description = 'Status'
+    
+    def qr_code_expires(self, obj):
+        return obj.qr_code.expires_at if hasattr(obj, 'qr_code') else 'No QR Code'
+    qr_code_expires.short_description = 'Expires At'
 
 # Admin actions for Terminal
 @admin.action(description="Test connection (ISAPI)")
@@ -142,8 +141,6 @@ def admin_open_door(modeladmin, request, queryset):
         done += 1 if res.get("ok") else 0
         fail += 0 if res.get("ok") else 1
     modeladmin.message_user(request, f"Open door sent: OK={done}, Failed={fail}")
-
-# REMOVED: Card management admin actions - Not needed for Remote-Only Mode
 
 # Terminal Admin
 class TerminalAdmin(admin.ModelAdmin):

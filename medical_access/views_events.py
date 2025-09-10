@@ -1,603 +1,270 @@
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.http import HttpResponse, JsonResponse
-from django.utils import timezone
-from django.conf import settings
-from django.shortcuts import get_object_or_404
 import json
-import re
 import logging
-import requests
-import hmac
-import hashlib
-from datetime import datetime, timedelta
-from medical_access.models import Terminal, Appointment, Patient, Doctor
-from medical_access.services import open_door, verify_simple_qr_code, generate_simple_qr_code
+import re
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
-BOUNDARY_RE = re.compile(r'^--(?P<b>[-A-Za-z0-9_]+)$')
+from .models import Appointment, Terminal, QRCode
+from .services import open_door
+from .utils.hik_multipart import extract_hik_events
+
+logger = logging.getLogger("medical_access.events")
 
 
-def verify_appointment_access(qr_code, terminal_mode):
-    """
-    Verify if a QR code has valid access based on appointment status (Remote-Only Mode).
-    Returns (is_valid, appointment, message)
-    """
-    try:
-        # First verify the QR code format
-        is_valid_qr, qr_data, qr_error = verify_simple_qr_code(qr_code)
-        if not is_valid_qr:
-            return False, None, f"❌ ACCESS DENIED: {qr_error}"
-        
-        # Find appointment with this QR code (active, enter, or leave status)
-        now = timezone.now()
-        appointment = Appointment.objects.filter(
-            qr_code=qr_code,
-            status__in=['active', 'enter', 'leave'],
-            valid_from__lte=now,
-            valid_till__gte=now
-        ).first()
-        
-        if not appointment:
-            return False, None, "❌ ACCESS DENIED: No valid appointment found for QR code"
-        
-        # Check if appointment is valid for this terminal mode
-        if terminal_mode.lower() == "entry":
-            if appointment.status == 'active':
-                # Mark as used and allow entry
-                appointment.status = 'enter'
-                appointment.used_at = now
-                appointment.save()
-                return True, appointment, f"✅ ACCESS GRANTED: Entry allowed for {appointment.patient.full_name}"
-            else:
-                return False, appointment, "❌ ACCESS DENIED: Appointment already used for entry"
-                
-        elif terminal_mode.lower() == "exit":
-            if appointment.status == 'enter':
-                # Mark as left and allow exit
-                appointment.status = 'leave'
-                appointment.save()
-                return True, appointment, f"✅ ACCESS GRANTED: Exit allowed for {appointment.patient.full_name}"
-            elif appointment.status == 'leave':
-                return False, appointment, "❌ ACCESS DENIED: Already exited"
-            else:
-                return False, appointment, "❌ ACCESS DENIED: Must enter before exiting"
-        else:
-            # For 'both' mode, check current status
-            if appointment.status == 'active':
-                appointment.status = 'enter'
-                appointment.used_at = now
-                appointment.save()
-                return True, appointment, f"✅ ACCESS GRANTED: Entry allowed for {appointment.patient.full_name}"
-            elif appointment.status == 'enter':
-                appointment.status = 'leave'
-                appointment.save()
-                return True, appointment, f"✅ ACCESS GRANTED: Exit allowed for {appointment.patient.full_name}"
-            else:
-                return False, appointment, "❌ ACCESS DENIED: Appointment already completed"
-                
-    except Exception as e:
-        return False, None, f"Verification error: {str(e)}"
+def _extract_qr_code(data):
+    """Extract QR code from various data structures"""
+    if isinstance(data, dict):
+        # Look for common QR code field names
+        for key in ['qrCode', 'qr_code', 'code', 'qr', 'cardNumber', 'card_number']:
+            if key in data and data[key]:
+                return data[key]
+        # Recursively search nested objects
+        for value in data.values():
+            if isinstance(value, (dict, list)):
+                result = _extract_qr_code(value)
+                if result:
+                    return result
+    elif isinstance(data, list):
+        for item in data:
+            result = _extract_qr_code(item)
+            if result:
+                return result
+    return None
 
-def remote_only_verify(qr_code, terminal_mode, terminal_ip):
-    """
-    Remote-Only verification: Check appointment validity using simple QR code.
-    No card provisioning or expiration - pure remote verification.
-    """
-    # Verify the appointment against database using QR code
-    is_valid, appointment, message = verify_appointment_access(qr_code, terminal_mode)
+
+def _get_next_status(current_status, terminal_mode):
+    """Get next status based on current status and terminal mode"""
+    mode = (terminal_mode or "").lower()
     
-    if is_valid and appointment:
-        # Update the message to indicate remote-only mode
-        message = f"{message} (Simple QR Code Remote Verification)"
-    
-    return is_valid, appointment, message
+    if mode == "entry":
+        return QRCode.Status.ENTERED if current_status == QRCode.Status.ACTIVE else None
+    elif mode == "exit":
+        return QRCode.Status.LEFT if current_status == QRCode.Status.ENTERED else None
+    else:  # both modes
+        if current_status == QRCode.Status.ACTIVE:
+            return QRCode.Status.ENTERED
+        elif current_status == QRCode.Status.ENTERED:
+            return QRCode.Status.LEFT
+    return None
+
 
 @csrf_exempt
-def hik_verify_receiver(request):
+@require_POST
+def validate_qr_and_open_door(request, terminal_id: int):
     """
-    Hikvision remote verification endpoint - FAST RESPONSE VERSION.
-    Terminal sends QR code here to get ALLOW/DENY decision.
-    Returns immediate response to prevent timeout.
+    Validate QR code for an appointment and open the door if allowed.
+    Accepts JSON: {"qr_code": "..."} or {"qr_payload": "..."}
     """
-    import time
-    t0 = time.time()
-    
+    terminal = get_object_or_404(Terminal, pk=terminal_id)
+
     try:
-        # Get terminal IP from request
-        terminal_ip = request.META.get("REMOTE_ADDR")
-        
-        # Parse the request body to get QR code
-        body = request.body.decode("utf-8", errors="ignore")
-        
-        logger = logging.getLogger(__name__)
-        
-        # Look up terminal by IP (for testing, also check localhost)
-        term = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
-        if not term and terminal_ip in ['127.0.0.1', 'localhost']:
-            # For testing from localhost, use Terminal 1
-            term = Terminal.objects.filter(terminal_name="Terminal 1", active=True).first()
-        
-        if not term:
-            logger.warning(f"Terminal not found for IP: {terminal_ip}")
-            return JsonResponse({"decision": "deny", "reason": "terminal_not_found"}, status=200)
-        
-        # Parse multipart body to find verification events
-        qr_code = None
-        for part in body.split("\n--"):
-            if "{" in part:
-                js = part[part.find("{"):]
-                try:
-                    data = json.loads(js)
-                except Exception:
-                    continue
-                    
-                ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
-                
-                # Check if this is a heartbeat event
-                if ev.get("eventType") == "heartBeat":
-                    return JsonResponse({"status": "heartbeat"}, status=200)
-                
-                # Check if this is a verification event
-                if ev.get("eventType") == "access" or ev.get("major") == 5:
-                    # Try multiple possible field names for QR code data
-                    qr_code = (ev.get("cardNo") or 
-                              ev.get("credentialNo") or 
-                              ev.get("qrCode") or
-                              ev.get("qrData") or
-                              ev.get("qr_code") or
-                              ev.get("qrCodeData") or
-                              ev.get("qrContent") or
-                              ev.get("data") or
-                              ev.get("content") or
-                              ev.get("cardNumber") or
-                              ev.get("card_number") or
-                              ev.get("qr") or
-                              ev.get("code") or
-                              ev.get("payload"))
-                    
-                    if qr_code:
-                        break
-        
-        if not qr_code:
-            logger.warning(f"No QR code found in request from {terminal_ip}")
-            # For testing: return ALLOW even without QR code to test the flow
-            resp = {"decision": "allow", "reason": "test-allow-no-qr"}
-            duration = (time.time() - t0) * 1000
-            return JsonResponse(resp, status=200)
-        
-        
-        # QUICK ALLOW for testing: respond immediately
-        resp = {
-            "decision": "allow",
-            "reason": "test-allow",
-            "qr_code": qr_code
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON format"}, status=400)
+
+    qr_code = data.get("qr_code") or data.get("qr_payload")
+    if not qr_code:
+        return JsonResponse({"ok": False, "error": "QR code required"}, status=400)
+
+    # Find appointment with this QR code
+    now = timezone.now()
+    appointment = (
+        Appointment.objects.select_related("patient", "doctor", "qr_code")
+        .filter(
+            qr_code__code=qr_code,
+            qr_code__status__in=[
+                QRCode.Status.ACTIVE,
+                QRCode.Status.ENTERED,
+                QRCode.Status.LEFT,
+            ],
+            qr_code__expires_at__gt=now,
+        )
+        .first()
+    )
+
+    if not appointment:
+        return JsonResponse(
+            {"ok": False, "error": "Invalid or expired QR code", "appointment": None},
+            status=400,
+        )
+
+    # Determine next status based on current status and terminal mode
+    current_status = appointment.qr_code.status
+    next_status = _get_next_status(current_status, terminal.mode)
+
+    if not next_status:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Access denied: Invalid status transition from {current_status} for {(terminal.mode or 'unknown').lower()} mode",
+                "appointment": {
+                    "id": appointment.id,
+                    "patient": appointment.patient.full_name,
+                    "doctor": appointment.doctor.full_name,
+                    "status": current_status,
+                },
+            },
+            status=403,
+        )
+
+    # Update QR status
+    appointment.qr_code.status = next_status
+    appointment.qr_code.save(update_fields=["status"])
+
+    # Try to open the door
+    result = open_door(terminal, door_no=1)
+    if not result.get("ok"):
+        # Rollback status change if door fails
+        appointment.qr_code.status = current_status
+        appointment.qr_code.save(update_fields=["status"])
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Failed to open door: {result.get('error', 'unknown')}",
+                "appointment": {
+                    "id": appointment.id,
+                    "patient": appointment.patient.full_name,
+                    "doctor": appointment.doctor.full_name,
+                    "status": appointment.qr_code.status,
+                },
+            },
+            status=502,
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Door opened successfully",
+            "appointment": {
+                "id": appointment.id,
+                "patient": appointment.patient.full_name,
+                "doctor": appointment.doctor.full_name,
+                "status": appointment.qr_code.status,
+            },
         }
-        duration = (time.time() - t0) * 1000
-        logger.info(f"[VERIFY OUT] {int(duration)}ms {resp}")
-        
-        return JsonResponse(resp, status=200)
-            
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Verification error: {e}")
-        resp = {"decision": "deny", "reason": "error", "error": str(e)}
-        duration = (time.time() - t0) * 1000
-        logger.info(f"[VERIFY OUT] {int(duration)}ms {resp}")
-        return JsonResponse(resp, status=200)
+    )
+
 
 @csrf_exempt
+@require_POST
 def hik_event_receiver(request):
     """
-    Remote verification receiver for Hikvision terminals.
-    Implements proper remote verification flow:
-    1. Receives scan events from terminals
-    2. Verifies against Django appointment logic
-    3. Returns allow/deny decision to terminal
-    4. Opens door if access granted
+    Accept Hikvision push events.
+    - Identify terminal by JSON 'ipAddress' first, then fall back to request IPs
+    - Ignore heartbeats / non-QR events fast (200 OK)
+    - Process only when a QR payload is present
+    - Perform the same status transition logic as /validate-qr/
     """
     try:
-        body = request.body.decode("utf-8", errors="ignore")
-        
-        # Get terminal IP from request
-        terminal_ip = request.META.get("REMOTE_ADDR")
-        
-        # Look up terminal by IP
-        term = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
-        if not term:
+        # Parse ONLY JSON parts out of multipart or raw JSON body
+        payloads = extract_hik_events(request) or []
+        if not payloads:
+            # Some firmwares send heartbeats with no JSON part; just 200 OK
             return HttpResponse("OK", status=200)
-        
-        mode = term.mode
-        terminal_name = term.terminal_name
-        
-        # Parse multipart body to find verification events
-        events = []
-        for part in body.split("\n--"):
-            if "{" in part:
-                js = part[part.find("{"):]
-                try:
-                    data = json.loads(js)
-                except Exception:
-                    continue
-                    
-                ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
-                card = ev.get("cardNo") or ev.get("credentialNo") or ev.get("qrCode")
-                major = ev.get("major") or ev.get("majorEventType")
-                
-                # Process access verification events (major=5)
-                if major == 5 and card:
-                    logger = logging.getLogger(__name__)
-                    
-                    # FAST RESPONSE: Check appointment status immediately
-                    try:
-                        appointment = Appointment.objects.filter(qr_code=card).first()
-                        if not appointment:
-                            logger.warning(f"No appointment found for QR: {card}")
-                            return HttpResponse("OK", status=200)
-                        
-                        # Check current status and determine action
-                        current_status = appointment.status
-                        terminal_mode = term.mode.lower()
-                        
-                        
-                        # Determine if access should be granted and what message to show
-                        access_granted = False
-                        status_message = ""
-                        
-                        if current_status == 'active':
-                            # First scan - Entry
-                            appointment.status = 'enter'
-                            appointment.used_at = timezone.now()
-                            appointment.save()
-                            access_granted = True
-                            status_message = "Welcome! Entry granted"
-                            
-                        elif current_status == 'enter' and terminal_mode in ['exit', 'both']:
-                            # Second scan - Exit
-                            appointment.status = 'leave'
-                            appointment.save()
-                            access_granted = True
-                            status_message = "Goodbye! Exit granted"
-                            
-                        elif current_status == 'leave':
-                            # Already left
-                            access_granted = False
-                            status_message = "Already left - Access denied"
-                            logger.warning(f"Already left: {appointment.patient.full_name}")
-                            
-                        else:
-                            # Invalid status for this terminal mode
-                            access_granted = False
-                            status_message = "Invalid status - Access denied"
-                            logger.warning(f"Invalid status {current_status} for mode {terminal_mode}")
-                        
-                        # Open door immediately if access granted
-                        if access_granted:
-                            try:
-                                open_door(term, door_no=1)
-                            except Exception as e:
-                                logger.error(f"Door open failed: {e}")
-                        
-                        # Return Hikvision XML format to prevent "Authentication Failed"
-                        if access_granted:
-                            # ALLOW response in Hikvision XML format
-                            response_xml = """<?xml version="1.0" encoding="UTF-8"?>
-<ResponseStatus>
-    <requestURL>/ISAPI/AccessControl/RemoteControl/door/1</requestURL>
-    <statusCode>1</statusCode>
-    <statusString>OK</statusString>
-    <subStatusCode>ok</subStatusCode>
-</ResponseStatus>"""
-                            return HttpResponse(response_xml, content_type="application/xml")
-                        else:
-                            # DENY response in Hikvision XML format
-                            response_xml = """<?xml version="1.0" encoding="UTF-8"?>
-<ResponseStatus>
-    <requestURL>/ISAPI/AccessControl/RemoteControl/door/1</requestURL>
-    <statusCode>4</statusCode>
-    <statusString>Forbidden</statusString>
-    <subStatusCode>forbidden</subStatusCode>
-</ResponseStatus>"""
-                            return HttpResponse(response_xml, content_type="application/xml")
-                        
-                    except Exception as e:
-                        logger.error(f"Verification error: {e}")
-                        return HttpResponse("OK", status=200)
-        
-        if not events:
-            # No verification events found, return OK
-            return HttpResponse("OK (no verification events)", status=200)
-        
-        # Return verification results
-        return JsonResponse({
-            "ok": True, 
-            "count": len(events), 
-            "events": events,
-            "terminal": {
-                "name": terminal_name,
-                "ip": terminal_ip,
-                "mode": mode
-            }
-        })
-        
+
+        # Iterate until we find a usable event
+        for data in payloads:
+            ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
+            embedded_ip = (ev.get("ipAddress") or "").strip()
+            qr = ev.get("qrCode") or ev.get("credentialNo") or ev.get("cardNo")
+            major = ev.get("major") or ev.get("majorEventType")
+            event_type = (ev.get("eventType") or "").lower()
+
+            # Resolve terminal:
+            term = None
+            if embedded_ip:
+                term = Terminal.objects.filter(terminal_ip=embedded_ip, active=True).first()
+            if not term:
+                # fallbacks (unreliable on some firmwares, but harmless)
+                xff = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+                remote = request.META.get("REMOTE_ADDR")
+                term = (
+                    Terminal.objects.filter(terminal_ip=xff, active=True).first()
+                    or Terminal.objects.filter(terminal_ip=remote, active=True).first()
+                )
+
+            if not term:
+                # Unknown device → OK and move on to next payload (don't spam warnings)
+                logger.info("HIK: unknown terminal (embedded_ip=%s, xff=%s, remote=%s)",
+                         embedded_ip, request.META.get("HTTP_X_FORWARDED_FOR"), request.META.get("REMOTE_ADDR"))
+                continue
+
+            # Fast-ignore: heartbeats & events without QR/card payload
+            if event_type == "heartbeat" or not qr:
+                # Quiet success, terminal won't retry
+                return HttpResponse("OK", status=200)
+
+            # Process only access verify events (major==5 on many firmwares), but
+            # we'll still accept if QR exists to be resilient across variants.
+            mode = (term.mode or "").lower()
+
+            appt = (
+                Appointment.objects
+                .select_related("patient", "doctor", "qr_code")
+                .filter(
+                    qr_code__code=qr,
+                    qr_code__status__in=[QRCode.Status.ACTIVE, QRCode.Status.ENTERED, QRCode.Status.LEFT],
+                    qr_code__expires_at__gt=timezone.now(),
+                )
+                .first()
+            )
+            if not appt:
+                # Return OK so device doesn't keep retrying; just no access
+                logger.info("HIK: invalid/expired QR from %s (%s) payload=%s",
+                         term.terminal_name, term.terminal_ip, qr)
+                return HttpResponse("OK", status=200)
+
+            current = appt.qr_code.status
+            next_status = None
+            if mode == "entry" and current == QRCode.Status.ACTIVE:
+                next_status = QRCode.Status.ENTERED
+            elif mode == "exit" and current == QRCode.Status.ENTERED:
+                next_status = QRCode.Status.LEFT
+            elif mode not in ("entry", "exit"):  # both
+                if current == QRCode.Status.ACTIVE:
+                    next_status = QRCode.Status.ENTERED
+                elif current == QRCode.Status.ENTERED:
+                    next_status = QRCode.Status.LEFT
+
+            if not next_status:
+                logger.info("HIK: deny at %s (%s) – invalid transition from %s in %s mode (qr=%s)",
+                         term.terminal_name, term.terminal_ip, current, mode or "both", qr)
+                return HttpResponse("OK", status=200)
+
+            # Update status and try to open door
+            appt.qr_code.status = next_status
+            appt.qr_code.save(update_fields=["status"])
+
+            res = open_door(term, door_no=1)
+            if not res.get("ok"):
+                # Roll back status if you prefer (optional)
+                appt.qr_code.status = current
+                appt.qr_code.save(update_fields=["status"])
+                logger.warning("HIK: door open failed at %s (%s): %s",
+                            term.terminal_name, term.terminal_ip, res.get("error"))
+
+            logger.info("HIK: access %s at %s (%s) for %s -> %s",
+                     "GRANTED" if res.get("ok") else "DENIED",
+                     term.terminal_name, term.terminal_ip, qr, next_status)
+
+            return HttpResponse("OK", status=200)
+
+        # If we got here, nothing actionable; return OK to avoid device retries
+        return HttpResponse("OK", status=200)
+
     except Exception as e:
-        # Log error to Django logging system instead of print
-        logger = logging.getLogger(__name__)
-        logger.error(f"Remote verification error: {e}")
-        # Always return 200 to keep terminal happy
+        # Never bubble errors to device; log and still 200
+        logger.error("HIK receiver error: %s", e, exc_info=True)
         return HttpResponse("OK", status=200)
 
 
-# =============================================================================
-# DMED PLATFORM INTEGRATION - EVENT HANDLERS
-# =============================================================================
-
-# DMED API Configuration
-DMED_API_TOKEN = getattr(settings, 'DMED_API_TOKEN', 'your-dmed-api-token')
-DMED_API_URL = getattr(settings, 'DMED_API_URL', 'https://api.dmed.com')
-DMED_SHARED_SECRET = getattr(settings, 'DMED_SHARED_SECRET', 'your-shared-secret')
-
-def verify_dmed_signature(request):
-    """
-    Verify DMED API signature for security
-    """
-    signature = request.headers.get('X-Signature', '')
-    if not signature:
-        return False, "Missing X-Signature header"
+@require_GET
+def get_terminal_mode_api(request, terminal_ip: str):
+    """Get the current mode of a terminal"""
+    terminal = Terminal.objects.filter(terminal_ip=terminal_ip, active=True).first()
+    mode = terminal.mode if terminal else "unknown"
     
-    # Extract hash from signature
-    if not signature.startswith('sha256='):
-        return False, "Invalid signature format"
-    
-    expected_hash = signature[7:]  # Remove 'sha256=' prefix
-    
-    # Calculate HMAC of request body
-    body = request.body
-    calculated_hash = hmac.new(
-        DMED_SHARED_SECRET.encode(),
-        body,
-        hashlib.sha256
-    ).hexdigest()
-    
-    if not hmac.compare_digest(expected_hash, calculated_hash):
-        return False, "Invalid signature"
-    
-    return True, "Valid signature"
-
-@csrf_exempt
-@require_POST
-def dmed_create_appointment(request):
-    """
-    DMED → PayVerify: Receive new appointment data from DMED
-    Creates appointment in our database and generates QR token
-    """
-    try:
-        # Verify authentication
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return JsonResponse({
-                'success': False,
-                'error': 'Missing or invalid Authorization header'
-            }, status=401)
-        
-        token = auth_header[7:]  # Remove 'Bearer ' prefix
-        if token != DMED_API_TOKEN:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid API token'
-            }, status=401)
-        
-        # Verify signature (optional but recommended)
-        is_valid_sig, sig_error = verify_dmed_signature(request)
-        if not is_valid_sig:
-            logger = logging.getLogger(__name__)
-            logger.warning(f"DMED signature verification failed: {sig_error}")
-            # Continue anyway for now, but log the warning
-        
-        # Parse request data
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid JSON data'
-            }, status=400)
-        
-        # Extract required fields from DMED data
-        dmed_appointment_id = data.get('appointment_id')
-        
-        # Patient information
-        patient_data = data.get('patient', {})
-        first_name = patient_data.get('first_name')
-        last_name = patient_data.get('last_name')
-        phone = patient_data.get('phone', '')
-        passport_series = patient_data.get('passport_series', '')
-        passport_number = patient_data.get('passport_number', '')
-        
-        # Doctor information
-        doctor_data = data.get('doctor', {})
-        doctor_name = doctor_data.get('name')
-        doctor_specialty = doctor_data.get('specialty', '')
-        
-        # Appointment timing
-        appointment_datetime = data.get('appointment_datetime')
-        
-        # Validate required fields
-        if not all([dmed_appointment_id, first_name, last_name, doctor_name]):
-            return JsonResponse({
-                'success': False,
-                'error': 'Missing required fields: appointment_id, patient name, doctor name'
-            }, status=400)
-        
-        # Check if appointment already exists
-        if Appointment.objects.filter(qr_code__contains=dmed_appointment_id).exists():
-            return JsonResponse({
-                'success': False,
-                'error': 'Appointment already exists'
-            }, status=409)
-        
-        # Get or create patient
-        if phone:
-            patient, created = Patient.objects.get_or_create(
-                phone=phone,
-                defaults={
-                    'first_name': first_name,
-                    'last_name': last_name,
-                    'passport_series': passport_series,
-                    'passport_number': passport_number
-                }
-            )
-            if not created:
-                # Update existing patient info
-                patient.first_name = first_name
-                patient.last_name = last_name
-                patient.passport_series = passport_series
-                patient.passport_number = passport_number
-                patient.save()
-        else:
-            # Create new patient without phone
-            patient = Patient.objects.create(
-                first_name=first_name,
-                last_name=last_name,
-                passport_series=passport_series,
-                passport_number=passport_number
-            )
-        
-        # Get or create doctor
-        # Split doctor name into first and last name
-        doctor_name_parts = doctor_name.split() if doctor_name else ['', '']
-        first_name = doctor_name_parts[0] if doctor_name_parts else ''
-        last_name = ' '.join(doctor_name_parts[1:]) if len(doctor_name_parts) > 1 else ''
-        
-        doctor, created = Doctor.objects.get_or_create(
-            first_name=first_name,
-            last_name=last_name,
-            defaults={
-                'procedure': doctor_specialty,
-                'price': 0.00
-            }
-        )
-        
-        # Parse appointment datetime
-        if appointment_datetime:
-            try:
-                if isinstance(appointment_datetime, str):
-                    appointment_dt = datetime.fromisoformat(appointment_datetime.replace('Z', '+00:00'))
-                else:
-                    appointment_dt = appointment_datetime
-            except (ValueError, TypeError):
-                appointment_dt = timezone.now()
-        else:
-            appointment_dt = timezone.now()
-        
-        # Set validity period (24 hours from appointment time)
-        valid_from = appointment_dt - timedelta(hours=1)  # 1 hour before appointment
-        valid_till = appointment_dt + timedelta(hours=25)  # 1 hour after appointment
-        
-        # Generate simple QR code
-        qr_code = generate_simple_qr_code()
-        
-        # Create appointment
-        appointment = Appointment.objects.create(
-            patient=patient,
-            doctor=doctor,
-            status='active',
-            valid_from=valid_from,
-            valid_till=valid_till,
-            qr_code=qr_code
-        )
-        
-        # Send QR code back to DMED
-        qr_sent = send_qr_to_dmed(dmed_appointment_id, qr_code, appointment.id)
-        
-        logger = logging.getLogger(__name__)
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Appointment created successfully',
-            'appointment_id': appointment.id,
-            'qr_token': token,
-            'qr_sent_to_dmed': qr_sent
-        })
-        
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"DMED appointment creation failed: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'error': f'Internal server error: {str(e)}'
-        }, status=500)
-
-def send_qr_to_dmed(dmed_appointment_id, qr_code, appointment_id):
-    """
-    PayVerify → DMED: Send QR code back to DMED
-    """
-    try:
-        url = f"{DMED_API_URL}/appointments/{dmed_appointment_id}/qr"
-        
-        headers = {
-            'Authorization': f'Bearer {DMED_API_TOKEN}',
-            'Content-Type': 'application/json'
-        }
-        
-        data = {
-            'appointment_id': dmed_appointment_id,
-            'qr_code': qr_code,
-            'payverify_appointment_id': appointment_id,
-            'qr_expires_at': timezone.now() + timedelta(hours=24).isoformat(),
-            'status': 'active'
-        }
-        
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            logger = logging.getLogger(__name__)
-            return True
-        else:
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send QR to DMED: {response.status_code} - {response.text}")
-            return False
-            
-    except requests.RequestException as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error sending QR to DMED: {str(e)}")
-        return False
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Unexpected error sending QR to DMED: {str(e)}")
-        return False
-
-@csrf_exempt
-@require_POST
-def dmed_appointment_status(request, appointment_id):
-    """
-    DMED → PayVerify: Update appointment status (optional webhook)
-    """
-    try:
-        # Verify authentication
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return JsonResponse({'error': 'Invalid authorization'}, status=401)
-        
-        token = auth_header[7:]
-        if token != DMED_API_TOKEN:
-            return JsonResponse({'error': 'Invalid token'}, status=401)
-        
-        data = json.loads(request.body)
-        new_status = data.get('status')
-        
-        if not new_status:
-            return JsonResponse({'error': 'Status required'}, status=400)
-        
-        appointment = get_object_or_404(Appointment, id=appointment_id)
-        appointment.status = new_status
-        appointment.save()
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Appointment {appointment_id} status updated to {new_status}'
-        })
-        
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"DMED status update failed: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({"ok": True, "terminal_ip": terminal_ip, "mode": mode})

@@ -47,6 +47,7 @@
                     <th class="appointments-table-header">DOCTOR</th>
                     <th class="appointments-table-header">SUM</th>
                     <th class="appointments-table-header">STATUS</th>
+                    <th class="appointments-table-header">QR STATUS</th>
                     <th class="appointments-table-header">ACTIONS</th>
                 </tr>
             </thead>
@@ -76,6 +77,27 @@
                             {{ appointment.get_status_display }}
                         </span>
                     </td>
+                    <td class="appointments-table-cell appointments-table-cell--qr-status">
+                        {% if appointment.qr_code %}
+                            <span class="qr-status-badge qr-status-badge--{{ appointment.qr_code.status }}">
+                                {% if appointment.qr_code.status == 'active' %}
+                                    <i class="fas fa-check-circle"></i> Active
+                                {% elif appointment.qr_code.status == 'entered' %}
+                                    <i class="fas fa-door-open"></i> Entered
+                                {% elif appointment.qr_code.status == 'left' %}
+                                    <i class="fas fa-door-closed"></i> Left
+                                {% elif appointment.qr_code.status == 'expired' %}
+                                    <i class="fas fa-clock"></i> Expired
+                                {% else %}
+                                    <i class="fas fa-question-circle"></i> {{ appointment.qr_code.get_status_display }}
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="qr-status-badge qr-status-badge--none">
+                                <i class="fas fa-times-circle"></i> No QR
+                            </span>
+                        {% endif %}
+                    </td>
                     <td class="appointments-table-cell">
                         <div class="appointments-actions">
                             <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
@@ -91,7 +113,7 @@
                 </tr>
                 {% empty %}
                 <tr class="appointments-table-row">
-                    <td colspan="7" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td>
+                    <td colspan="8" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td>
                 </tr>
                 {% endfor %}
             </tbody>

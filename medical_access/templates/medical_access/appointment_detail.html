@@ -120,7 +120,67 @@
                 </h2>
             </div>
             
-            {% if appointment.status == 'active' %}
+            {% if appointment.qr_code %}
+                <!-- QR Code Status Display -->
+                <div class="appointment-detail-qr-status">
+                    <div class="appointment-detail-qr-status-header">
+                        <h3 class="appointment-detail-qr-status-title">Current QR Code Status</h3>
+                        <span class="qr-status-badge qr-status-badge--{{ appointment.qr_code.status }}">
+                            {% if appointment.qr_code.status == 'active' %}
+                                <i class="fas fa-check-circle"></i> Active
+                            {% elif appointment.qr_code.status == 'entered' %}
+                                <i class="fas fa-door-open"></i> Entered
+                            {% elif appointment.qr_code.status == 'left' %}
+                                <i class="fas fa-door-closed"></i> Left
+                            {% elif appointment.qr_code.status == 'expired' %}
+                                <i class="fas fa-clock"></i> Expired
+                            {% else %}
+                                <i class="fas fa-question-circle"></i> {{ appointment.qr_code.get_status_display }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="appointment-detail-qr-info-grid">
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">QR Code</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.code }}</span>
+                        </div>
+                        
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">Generated</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.created_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                        
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">Expires</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.expires_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                        
+                        {% if appointment.qr_code.used_at %}
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">Last Used</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.used_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="appointment-detail-qr-actions">
+                        <a href="{% url 'medical_access:generate_receipt' appointment.id %}" class="appointment-detail-btn appointment-detail-btn--success">
+                            <i class="fas fa-print"></i>
+                            Print Receipt
+                        </a>
+                        {% if appointment.status == 'active' %}
+                        <form method="post" action="{% url 'medical_access:create_qr' appointment.id %}" class="appointment-detail-qr-form">
+                            {% csrf_token %}
+                            <button type="submit" class="appointment-detail-btn appointment-detail-btn--primary">
+                                <i class="fas fa-refresh"></i>
+                                Regenerate QR Code
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif appointment.status == 'active' %}
                 <div class="appointment-detail-qr-section">
                     <div class="appointment-detail-qr-info">
                         <p class="appointment-detail-qr-description">
