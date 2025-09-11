@@ -163,16 +163,19 @@ class TerminalAdmin(admin.ModelAdmin):
 
 # Integration Admin
 class IntegrationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'api_url', 'is_active', 'created_at', 'token_preview')
+    list_display = ('name', 'api_url', 'is_active', 'token_preview', 'created_at')
     list_filter = ('is_active', 'created_at')
     search_fields = ('name', 'api_url')
     ordering = ('name',)
-    readonly_fields = ('created_at', 'updated_at')
-    exclude = ('api_token',)  # Completely exclude api_token from the form
+    readonly_fields = ('api_token', 'token_preview', 'created_at', 'updated_at')
     
     fieldsets = (
         ('Integration Information', {
             'fields': ('name', 'api_url', 'is_active')
+        }),
+        ('API Token', {
+            'fields': ('token_preview', 'api_token'),
+            'description': 'This token is automatically generated and used by external platforms to authenticate API requests. Keep it secure!'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -181,10 +184,12 @@ class IntegrationAdmin(admin.ModelAdmin):
     )
     
     def token_preview(self, obj):
-        if obj.api_token:
-            return f"{obj.api_token[:8]}...{obj.api_token[-8:]}"
-        return "No token"
-    token_preview.short_description = "Token Preview"
+        if not obj or not getattr(obj, "api_token", None):
+            return "-"
+        token = obj.api_token
+        # Show a short, safe preview
+        return f"{token[:8]}…{token[-4:]}"
+    token_preview.short_description = "Token (preview)"
 
 # QRCode Admin
 class QRCodeAdmin(admin.ModelAdmin):
