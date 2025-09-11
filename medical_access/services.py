@@ -6,7 +6,7 @@ from .models import Terminal
 
 
 # Simple QR Code Verification
-def verify_simple_token(qr_code: str) -> tuple[bool, dict, str]:
+def verify_simple_token(qr_code: str):
     """  Verify a simple QR code format. Args: qr_code: The QR code to verify Returns: (is_valid, qr_data, error_message) """
     if not qr_code:
         return False, {}, "Empty QR code"

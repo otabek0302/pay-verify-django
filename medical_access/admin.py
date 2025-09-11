@@ -144,7 +144,7 @@ def admin_open_door(modeladmin, request, queryset):
 
 # Terminal Admin
 class TerminalAdmin(admin.ModelAdmin):
-    list_display = ("terminal_name", "terminal_ip", "mac_address", "mode", "active", "reachable", "last_seen", "short_error", "action_buttons")
+    list_display = ("terminal_name", "terminal_ip", "mac_address", "mode", "active", "reachable", "last_seen", "short_error")
     list_filter = ("mode", "active", "reachable", "created_at")
     search_fields = ("terminal_name", "terminal_ip", "mac_address", "terminal_username")
     actions = [admin_test_connection, admin_open_door]
@@ -153,18 +153,6 @@ class TerminalAdmin(admin.ModelAdmin):
     def short_error(self, obj):
         return (obj.last_error or "")[:60]
     short_error.short_description = "Last Error"
-    
-    def action_buttons(self, obj):
-        health_url = reverse('medical_access:admin_terminal_health', args=[obj.pk])
-        open_url = reverse('medical_access:admin_terminal_open', args=[obj.pk])
-        
-        return format_html(
-            '<a class="button" href="{}" style="background: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">Health</a>'
-            '<a class="button" href="{}" style="background: #007cba; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;" onclick="return confirm(\'Open door on {}?\')">Open</a>',
-            health_url, open_url, obj.terminal_name
-        )
-    action_buttons.short_description = "Actions"
-    action_buttons.allow_tags = True
     
     fieldsets = (
         ('Terminal Information', {

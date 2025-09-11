@@ -11,7 +11,7 @@ class HikTerminal:
     Minimal ISAPI client for Hikvision access terminals (DS-K1T342MFWX-E1).
     Uses HTTP Digest Auth with JSON format.
     """
-    def __init__(self, host: str, username: str, password: str, timeout: int | float | None = None, port: int = 80, use_xml: bool = True):
+    def __init__(self, host: str, username: str, password: str, timeout=None, port: int = 80, use_xml: bool = True):
         self.base = f"http://{host}" if port in (80, None) else f"http://{host}:{port}"
         self.auth = HTTPDigestAuth(username, password)
         self.timeout = timeout or DEFAULT_TIMEOUT
