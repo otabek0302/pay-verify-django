@@ -184,8 +184,8 @@ class IntegrationAdmin(admin.ModelAdmin):
             'fields': ('name', 'api_url', 'is_active')
         }),
         ('API Token', {
-            'fields': ('api_token',),
-            'description': 'This token is used by external platforms to authenticate API requests. Keep it secure!'
+            'fields': ('token_preview',),
+            'description': 'This token is automatically generated and used by external platforms to authenticate API requests. Keep it secure!'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
