@@ -167,16 +167,12 @@ class IntegrationAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     search_fields = ('name', 'api_url')
     ordering = ('name',)
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'token_preview')
     exclude = ('api_token',)  # Completely exclude api_token from the form
     
     fieldsets = (
         ('Integration Information', {
             'fields': ('name', 'api_url', 'is_active')
-        }),
-        ('API Token', {
-            'fields': ('token_preview',),
-            'description': 'This token is automatically generated and used by external platforms to authenticate API requests. Keep it secure!'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
