@@ -31,7 +31,24 @@ payverify_django/
 └── README.md            # This file
 ```
 
-## Setup Instructions
+## Quick Start (Docker - Recommended)
+
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd payverify_django
+   ```
+
+2. **Run the setup script:**
+   ```bash
+   ./setup.sh
+   ```
+
+3. **Access the application:**
+   - Main app: http://localhost
+   - Admin panel: http://localhost/admin (admin/admin123)
+
+## Manual Setup (Development)
 
 1. **Install dependencies:**
    ```bash
@@ -58,6 +75,10 @@ payverify_django/
    ```bash
    python manage.py runserver
    ```
+
+## Deployment
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## API Endpoints
 
