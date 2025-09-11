@@ -182,14 +182,6 @@ class IntegrationAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
-    def token_preview(self, obj):
-        if not obj or not getattr(obj, "api_token", None):
-            return "-"
-        token = obj.api_token
-        # Show a short, safe preview
-        return f"{token[:8]}…{token[-4:]}"
-    token_preview.short_description = "Token (preview)"
 
 # QRCode Admin
 class QRCodeAdmin(admin.ModelAdmin):

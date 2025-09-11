@@ -126,6 +126,12 @@ class Integration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def token_preview(self):
+        if not self.api_token:
+            return "-"
+        return f"{self.api_token[:8]}…{self.api_token[-4:]}"
+
     class Meta:
         verbose_name = "Integration"
         verbose_name_plural = "Integrations"
