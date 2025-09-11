@@ -52,7 +52,7 @@ class CustomUserAdmin(UserAdmin):
 
 # Doctor Admin
 class DoctorAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'first_name', 'last_name', 'procedure', 'price', 'created_at')
+    list_display = ('first_name', 'last_name', 'procedure', 'price', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('first_name', 'last_name', 'procedure')
     ordering = ('last_name', 'first_name')
@@ -73,7 +73,7 @@ class DoctorAdmin(admin.ModelAdmin):
 
 # Patient Admin
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'passport_series', 'passport_number', 'phone', 'created_at')
+    list_display = ('first_name', 'last_name', 'passport_series', 'passport_number', 'phone', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('first_name', 'last_name', 'phone', 'passport_series', 'passport_number')
     ordering = ('last_name', 'first_name')
@@ -193,8 +193,8 @@ class IntegrationAdmin(admin.ModelAdmin):
 # QRCode Admin
 class QRCodeAdmin(admin.ModelAdmin):
     list_display = ('code', 'appointment', 'status', 'expires_at', 'revoked', 'created_at')
-    list_filter = ('status', 'revoked', 'created_at', 'expires_at')
-    search_fields = ('code', 'appointment__patient__first_name', 'appointment__patient__last_name')
+    list_filter = ('status', 'revoked', 'created_at')
+    search_fields = ('code',)
     ordering = ('-created_at',)
     readonly_fields = ('code', 'created_at')
     
