@@ -28,6 +28,13 @@ if [ ! -f .env ]; then
     read
 fi
 
+# Create logs directory if it doesn't exist
+if [ ! -d logs ]; then
+    echo "📁 Creating logs directory..."
+    mkdir -p logs
+    echo "✅ Logs directory created."
+fi
+
 # Make scripts executable
 chmod +x deploy.sh
 chmod +x entrypoint.sh

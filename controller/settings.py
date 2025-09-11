@@ -198,22 +198,27 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": "logs/django.log",
-            "formatter": "verbose",
-        },
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "medical_access": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
     },
 }
+
+# Add file logging only if logs directory exists
+if os.path.exists(BASE_DIR / "logs"):
+    LOGGING["handlers"]["file"] = {
+        "class": "logging.FileHandler",
+        "filename": str(BASE_DIR / "logs" / "django.log"),
+        "formatter": "verbose",
+    }
+    LOGGING["loggers"]["django"]["handlers"].append("file")
+    LOGGING["loggers"]["medical_access"]["handlers"].append("file")

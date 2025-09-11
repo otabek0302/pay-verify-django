@@ -8,6 +8,9 @@ ENV PYTHONUNBUFFERED=1
 # Create working dir
 WORKDIR /app
 
+# Create logs directory
+RUN mkdir -p logs
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     libpq-dev gcc netcat-traditional curl \
