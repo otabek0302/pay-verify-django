@@ -177,7 +177,8 @@ class IntegrationAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     search_fields = ('name', 'api_url')
     ordering = ('name',)
-    readonly_fields = ('api_token', 'created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at')
+    exclude = ('api_token',)  # Completely exclude api_token from the form
     
     fieldsets = (
         ('Integration Information', {
@@ -198,12 +199,6 @@ class IntegrationAdmin(admin.ModelAdmin):
             return f"{obj.api_token[:8]}...{obj.api_token[-8:]}"
         return "No token"
     token_preview.short_description = "Token Preview"
-    
-    def get_readonly_fields(self, request, obj=None):
-        # Make api_token readonly after creation
-        if obj:  # editing an existing object
-            return self.readonly_fields
-        return ('created_at', 'updated_at')  # allow setting token on creation
 
 # QRCode Admin
 class QRCodeAdmin(admin.ModelAdmin):
