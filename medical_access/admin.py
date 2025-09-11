@@ -94,8 +94,8 @@ class PatientAdmin(admin.ModelAdmin):
 
 # Appointment Admin
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'doctor', 'qr_code_status', 'qr_code_expires', 'created_at')
-    list_filter = ('qr_code__status', 'created_at')
+    list_display = ('patient', 'doctor', 'created_at')
+    list_filter = ('created_at',)
     search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at')
@@ -104,10 +104,7 @@ class AppointmentAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Appointment Details', {
-            'fields': ('patient', 'doctor', 'created_by')
-        }),
-        ('QR Code', {
-            'fields': ('qr_code',)
+            'fields': ('patient', 'doctor')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -115,13 +112,6 @@ class AppointmentAdmin(admin.ModelAdmin):
         }),
     )
     
-    def qr_code_status(self, obj):
-        return obj.qr_code.status if hasattr(obj, 'qr_code') else 'No QR Code'
-    qr_code_status.short_description = 'Status'
-    
-    def qr_code_expires(self, obj):
-        return obj.qr_code.expires_at if hasattr(obj, 'qr_code') else 'No QR Code'
-    qr_code_expires.short_description = 'Expires At'
 
 # Admin actions for Terminal
 @admin.action(description="Test connection (ISAPI)")
