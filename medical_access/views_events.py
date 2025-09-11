@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST, require_GET
@@ -148,6 +147,21 @@ def validate_qr_and_open_door(request, terminal_id: int):
     )
 
 
+def _hik_xml_response(ok: bool, description: str = "OK"):
+    # Minimal ResponseStatus for AcsEvent to avoid device-side timeout displays.
+    # Many firmwares accept this as an acknowledgement; we still execute local relay via open_door.
+    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<ResponseStatus version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <requestURL>/ISAPI/AccessControl/AcsEvent</requestURL>
+    <statusCode>{1 if ok else 1}</statusCode>
+    <statusString>OK</statusString>
+    <subStatusCode>{"success" if ok else "fail"}</subStatusCode>
+    <errorCode>{200 if ok else 200}</errorCode>
+    <description>{description}</description>
+</ResponseStatus>"""
+    return HttpResponse(body, content_type="application/xml; charset=UTF-8", status=200)
+
+
 @csrf_exempt
 @require_POST
 def hik_event_receiver(request):
@@ -161,39 +175,75 @@ def hik_event_receiver(request):
     try:
         # Parse ONLY JSON parts out of multipart or raw JSON body
         payloads = extract_hik_events(request) or []
+        logger.info("HIK: extracted %d payloads from request", len(payloads))
         if not payloads:
             # Some firmwares send heartbeats with no JSON part; just 200 OK
+            logger.info("HIK: no payloads found, returning OK")
             return HttpResponse("OK", status=200)
 
         # Iterate until we find a usable event
-        for data in payloads:
-            ev = data.get("AccessControllerEvent") or data.get("AcsEvent") or {}
-            embedded_ip = (ev.get("ipAddress") or "").strip()
-            qr = ev.get("qrCode") or ev.get("credentialNo") or ev.get("cardNo")
-            major = ev.get("major") or ev.get("majorEventType")
-            event_type = (ev.get("eventType") or "").lower()
+        for i, data in enumerate(payloads):
+            logger.info("HIK: processing payload %d: %s", i, data)
 
-            # Resolve terminal:
+            # Hikvision sends metadata (ip/mac/eventType) at the top-level and the actual event under AccessControllerEvent/AcsEvent.
+            meta = data or {}
+            ev = meta.get("AccessControllerEvent") or meta.get("AcsEvent") or meta
+
+            # Read device identity from TOP-LEVEL meta (not from ev)
+            embedded_ip = (meta.get("ipAddress") or "").strip()
+            embedded_mac = (meta.get("macAddress") or "").strip().lower()
+
+            # Determine event type from top-level, then normalize
+            event_type = (meta.get("eventType") or ev.get("eventType") or "").strip().lower()
+
+            # Extract QR / credential payload from event body
+            qr = (
+                ev.get("qrCode")
+                or ev.get("credentialNo")
+                or ev.get("cardNo")
+                or ev.get("code")
+            )
+            # Some firmwares put QR under nested dicts; last-resort recursive search
+            if not qr:
+                qr = _extract_qr_code(ev)
+
+            # Resolve terminal by MAC address first, then IP addresses
             term = None
-            if embedded_ip:
+            
+            # Priority 1: MAC address (most reliable)
+            if embedded_mac:
+                term = Terminal.objects.filter(mac_address__iexact=embedded_mac, active=True).first()
+                if term:
+                    logger.info("HIK: terminal identified by MAC address: %s -> %s", embedded_mac, term.terminal_name)
+                else:
+                    logger.info("HIK: MAC address %s not found in database", embedded_mac)
+            
+            # Priority 2: Embedded IP address
+            if not term and embedded_ip:
                 term = Terminal.objects.filter(terminal_ip=embedded_ip, active=True).first()
+                if term:
+                    logger.info("HIK: terminal identified by embedded IP: %s -> %s", embedded_ip, term.terminal_name)
+            
+            # Priority 3: Request IP addresses (fallback)
             if not term:
-                # fallbacks (unreliable on some firmwares, but harmless)
                 xff = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
                 remote = request.META.get("REMOTE_ADDR")
                 term = (
                     Terminal.objects.filter(terminal_ip=xff, active=True).first()
                     or Terminal.objects.filter(terminal_ip=remote, active=True).first()
                 )
+                if term:
+                    logger.info("HIK: terminal identified by request IP: %s/%s -> %s", xff, remote, term.terminal_name)
 
             if not term:
                 # Unknown device → OK and move on to next payload (don't spam warnings)
-                logger.info("HIK: unknown terminal (embedded_ip=%s, xff=%s, remote=%s)",
-                         embedded_ip, request.META.get("HTTP_X_FORWARDED_FOR"), request.META.get("REMOTE_ADDR"))
+                logger.info("HIK: unknown terminal (mac=%s, embedded_ip=%s, xff=%s, remote=%s, event_type=%s, qr=%s)",
+                            embedded_mac, embedded_ip, request.META.get("HTTP_X_FORWARDED_FOR"),
+                            request.META.get("REMOTE_ADDR"), event_type, qr)
                 continue
 
             # Fast-ignore: heartbeats & events without QR/card payload
-            if event_type == "heartbeat" or not qr:
+            if event_type in ("heartbeat", "heartbeat") or not qr:
                 # Quiet success, terminal won't retry
                 return HttpResponse("OK", status=200)
 
@@ -212,10 +262,10 @@ def hik_event_receiver(request):
                 .first()
             )
             if not appt:
-                # Return OK so device doesn't keep retrying; just no access
+                # Return XML deny so device doesn't show timeout; just no access
                 logger.info("HIK: invalid/expired QR from %s (%s) payload=%s",
-                         term.terminal_name, term.terminal_ip, qr)
-                return HttpResponse("OK", status=200)
+                            term.terminal_name, term.terminal_ip, qr)
+                return _hik_xml_response(False, "Access denied (invalid or expired)")
 
             current = appt.qr_code.status
             next_status = None
@@ -247,10 +297,14 @@ def hik_event_receiver(request):
                             term.terminal_name, term.terminal_ip, res.get("error"))
 
             logger.info("HIK: access %s at %s (%s) for %s -> %s",
-                     "GRANTED" if res.get("ok") else "DENIED",
-                     term.terminal_name, term.terminal_ip, qr, next_status)
+                        "GRANTED" if res.get("ok") else "DENIED",
+                        term.terminal_name, term.terminal_ip, qr, next_status)
 
-            return HttpResponse("OK", status=200)
+            # Always return XML so device doesn't show 'timeout'
+            if res.get("ok"):
+                return _hik_xml_response(True, "Access granted")
+            else:
+                return _hik_xml_response(False, f"Door open failed: {res.get('error', 'unknown')}")
 
         # If we got here, nothing actionable; return OK to avoid device retries
         return HttpResponse("OK", status=200)

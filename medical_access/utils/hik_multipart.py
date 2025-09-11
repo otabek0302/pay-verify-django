@@ -12,11 +12,13 @@ def extract_hik_events(request):
     Returns list of parsed JSON objects or None if no valid events found.
     """
     try:
+        # Get the raw body once
+        raw_body = request.body.decode('utf-8', 'ignore')
+        
         # Try JSON body first
         if request.content_type == 'application/json':
-            raw = request.body.decode('utf-8', 'ignore')
-            if raw and raw.strip().startswith('{'):
-                data = json.loads(raw)
+            if raw_body and raw_body.strip().startswith('{'):
+                data = json.loads(raw_body)
                 return [data] if data else []
         
         # Try multipart form data
@@ -34,15 +36,14 @@ def extract_hik_events(request):
                 return events
         
         # Try raw body parsing for multipart
-        raw = request.body.decode('utf-8', 'ignore')
-        if '--MIME_boundary' in raw or 'Content-Disposition: form-data' in raw:
+        if '--MIME_boundary' in raw_body or 'Content-Disposition: form-data' in raw_body:
             events = []
             # Split by boundary markers
-            parts = raw.split('--MIME_boundary')
+            parts = raw_body.split('--MIME_boundary')
             
             for part in parts:
-                if 'Content-Type: application/json' in part:
-                    # Extract JSON content
+                if 'Content-Type: application/json' in part and 'AccessControllerEvent' in part:
+                    # Extract JSON content - look for the JSON block after the headers
                     lines = part.split('\n')
                     json_lines = []
                     in_json = False
@@ -52,19 +53,21 @@ def extract_hik_events(request):
                             in_json = True
                             continue
                         elif in_json and line.strip() and not line.startswith('Content-') and not line.startswith('--'):
+                            # This is JSON content
                             json_lines.append(line)
-                        elif in_json and line.strip() == '--MIME_boundary--':
+                        elif in_json and (line.strip() == '--MIME_boundary--' or line.strip() == ''):
                             # End of JSON block
                             break
                     
                     if json_lines:
                         try:
                             json_str = '\n'.join(json_lines).strip()
-                            if json_str:
+                            if json_str and json_str.startswith('{'):
                                 data = json.loads(json_str)
                                 if data:
                                     events.append(data)
-                        except (json.JSONDecodeError, TypeError):
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.debug(f"JSON parse error: {e}, content: {json_str[:100]}")
                             continue
             
             return events if events else []

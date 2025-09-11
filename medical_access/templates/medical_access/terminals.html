@@ -23,6 +23,7 @@
                     <th class="terminals-table-header">ID</th>
                     <th class="terminals-table-header">Name</th>
                     <th class="terminals-table-header">IP Address</th>
+                    <th class="terminals-table-header">MAC Address</th>
                     <th class="terminals-table-header">Mode</th>
                     <th class="terminals-table-header">Status</th>
                     <th class="terminals-table-header">Last Seen</th>
@@ -35,6 +36,7 @@
                     <td class="terminals-table-cell">{{ terminal.id }}</td>
                     <td class="terminals-table-cell terminals-table-cell--name">{{ terminal.terminal_name }}</td>
                     <td class="terminals-table-cell terminals-table-cell--ip">{{ terminal.terminal_ip }}</td>
+                    <td class="terminals-table-cell terminals-table-cell--mac">{{ terminal.mac_address|default:"Not Set" }}</td>
                     <td class="terminals-table-cell terminals-table-cell--mode">
                         <span class="terminal-mode-badge terminal-mode-badge--{{ terminal.mode|lower }}">
                             {{ terminal.mode|upper }}

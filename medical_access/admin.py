@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.views import redirect_to_login
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import User, Doctor, Patient, Appointment, Terminal
+from .models import User, Doctor, Patient, Appointment, Terminal, Integration, QRCode
 from .services import probe_terminal, open_door
 
 # Custom Admin Site with Role-based Access
@@ -144,9 +144,9 @@ def admin_open_door(modeladmin, request, queryset):
 
 # Terminal Admin
 class TerminalAdmin(admin.ModelAdmin):
-    list_display = ("terminal_name", "terminal_ip", "mode", "active", "reachable", "last_seen", "short_error", "action_buttons")
+    list_display = ("terminal_name", "terminal_ip", "mac_address", "mode", "active", "reachable", "last_seen", "short_error", "action_buttons")
     list_filter = ("mode", "active", "reachable", "created_at")
-    search_fields = ("terminal_name", "terminal_ip", "terminal_username")
+    search_fields = ("terminal_name", "terminal_ip", "mac_address", "terminal_username")
     actions = [admin_test_connection, admin_open_door]
     readonly_fields = ('created_at', 'updated_at')
     
@@ -168,7 +168,7 @@ class TerminalAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Terminal Information', {
-            'fields': ('terminal_name', 'terminal_ip', 'mode')
+            'fields': ('terminal_name', 'terminal_ip', 'mac_address', 'mode')
         }),
         ('Credentials', {
             'fields': ('terminal_username', 'terminal_password')
@@ -183,12 +183,69 @@ class TerminalAdmin(admin.ModelAdmin):
         }),
     )
 
+# Integration Admin
+class IntegrationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'api_url', 'is_active', 'created_at', 'token_preview')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'api_url')
+    ordering = ('name',)
+    readonly_fields = ('api_token', 'created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Integration Information', {
+            'fields': ('name', 'api_url', 'is_active')
+        }),
+        ('API Token', {
+            'fields': ('api_token',),
+            'description': 'This token is used by external platforms to authenticate API requests. Keep it secure!'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def token_preview(self, obj):
+        if obj.api_token:
+            return f"{obj.api_token[:8]}...{obj.api_token[-8:]}"
+        return "No token"
+    token_preview.short_description = "Token Preview"
+    
+    def get_readonly_fields(self, request, obj=None):
+        # Make api_token readonly after creation
+        if obj:  # editing an existing object
+            return self.readonly_fields
+        return ('created_at', 'updated_at')  # allow setting token on creation
+
+# QRCode Admin
+class QRCodeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'appointment', 'status', 'expires_at', 'revoked', 'created_at')
+    list_filter = ('status', 'revoked', 'created_at', 'expires_at')
+    search_fields = ('code', 'appointment__patient__first_name', 'appointment__patient__last_name')
+    ordering = ('-created_at',)
+    readonly_fields = ('code', 'created_at')
+    
+    fieldsets = (
+        ('QR Code Information', {
+            'fields': ('code', 'appointment', 'status', 'revoked')
+        }),
+        ('Expiration', {
+            'fields': ('expires_at',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
 # Register all models with the custom admin site
 medical_admin_site.register(User, CustomUserAdmin)
 medical_admin_site.register(Doctor, DoctorAdmin)
 medical_admin_site.register(Patient, PatientAdmin)
 medical_admin_site.register(Appointment, AppointmentAdmin)
 medical_admin_site.register(Terminal, TerminalAdmin)
+medical_admin_site.register(Integration, IntegrationAdmin)
+medical_admin_site.register(QRCode, QRCodeAdmin)
 
 # Also register with default admin site for super admin users
 admin.site.register(User, CustomUserAdmin)
@@ -196,3 +253,5 @@ admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(Patient, PatientAdmin)
 admin.site.register(Appointment, AppointmentAdmin)
 admin.site.register(Terminal, TerminalAdmin)
+admin.site.register(Integration, IntegrationAdmin)
+admin.site.register(QRCode, QRCodeAdmin)
