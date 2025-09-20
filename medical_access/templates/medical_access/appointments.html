@@ -1,4 +1,6 @@
 {% extends 'medical_access/base.html' %}
+{% load static %}
+{% now "U" as timestamp %}
 
 {% block title %}Appointments - PayVerify{% endblock %}
 
@@ -23,7 +25,7 @@
         </div>
         <div class="appointments-search-controls">
             <div class="appointments-search-input">
-                <input type="text" id="appointments-search" class="appointments-input" placeholder="Search by name/phone">
+                <input type="text" id="appointments-search" class="appointments-input" placeholder="Search by name/medical card">
             </div>
             <button class="appointments-action-btn appointments-action-btn--search" onclick="searchAppointments()">Search</button>
             <div class="appointments-period-select">
@@ -43,10 +45,7 @@
                 <tr class="appointments-table-row">
                     <th class="appointments-table-header">ID</th>
                     <th class="appointments-table-header">PATIENT</th>
-                    <th class="appointments-table-header">PROCEDURE</th>
-                    <th class="appointments-table-header">DOCTOR</th>
-                    <th class="appointments-table-header">SUM</th>
-                    <th class="appointments-table-header">STATUS</th>
+                    <th class="appointments-table-header">MEDICAL CARD</th>
                     <th class="appointments-table-header">QR STATUS</th>
                     <th class="appointments-table-header">ACTIONS</th>
                 </tr>
@@ -58,24 +57,10 @@
                     <td class="appointments-table-cell appointments-table-cell--patient">
                         <div class="appointments-patient-info">
                             <span class="appointments-patient-name">{{ appointment.patient.full_name }}</span>
-                            {% if appointment.patient.phone %}
-                                <small class="appointments-patient-phone">{{ appointment.patient.phone }}</small>
-                            {% endif %}
                         </div>
                     </td>
-                    <td class="appointments-table-cell appointments-table-cell--procedure">
-                        <span class="appointments-procedure-title">{{ appointment.doctor.procedure }}</span>
-                    </td>
-                    <td class="appointments-table-cell appointments-table-cell--doctor">
-                        <span class="appointments-doctor-name">{{ appointment.doctor.full_name }}</span>
-                    </td>
-                    <td class="appointments-table-cell appointments-table-cell--price">
-                        <span class="appointments-price">{{ appointment.doctor.price }} sum</span>
-                    </td>
-                    <td class="appointments-table-cell appointments-table-cell--status">
-                        <span class="status-badge status-badge--{{ appointment.status }}">
-                            {{ appointment.get_status_display }}
-                        </span>
+                    <td class="appointments-table-cell appointments-table-cell--medical-card">
+                        <span class="appointments-medical-card">{{ appointment.patient.medical_card_number }}</span>
                     </td>
                     <td class="appointments-table-cell appointments-table-cell--qr-status">
                         {% if appointment.qr_code %}
@@ -113,7 +98,7 @@
                 </tr>
                 {% empty %}
                 <tr class="appointments-table-row">
-                    <td colspan="8" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td>
+                    <td colspan="5" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -165,54 +150,31 @@
                 
                 <div class="modal-form-row">
                     <div class="modal-form-group">
-                        <label for="edit_patient" class="modal-form-label">Patient *</label>
-                        <select id="edit_patient" name="patient_id" class="modal-form-select" required>
-                            <option value="">— Select Patient —</option>
-                            {% for patient in patients %}
-                            <option value="{{ patient.id }}">{{ patient.full_name }} ({{ patient.phone }})</option>
-                            {% endfor %}
-                        </select>
+                        <label for="edit_first_name" class="modal-form-label">First Name *</label>
+                        <input type="text" id="edit_first_name" name="first_name" class="modal-form-input" required>
                     </div>
                     <div class="modal-form-group">
-                        <label for="edit_doctor" class="modal-form-label">Doctor & Procedure *</label>
-                        <select id="edit_doctor" name="doctor_id" class="modal-form-select" required>
-                            <option value="">— Select Doctor —</option>
-                            {% for doctor in doctors %}
-                            <option value="{{ doctor.id }}" data-price="{{ doctor.price }}">
-                                {{ doctor.full_name }} - {{ doctor.procedure }} ({{ doctor.price }} sum)
-                            </option>
-                            {% endfor %}
-                        </select>
+                        <label for="edit_last_name" class="modal-form-label">Last Name *</label>
+                        <input type="text" id="edit_last_name" name="last_name" class="modal-form-input" required>
                     </div>
                 </div>
                 
-                <div class="modal-form-row">
-                    <div class="modal-form-group">
-                        <label for="edit_status" class="modal-form-label">Status</label>
-                        <select id="edit_status" name="status" class="modal-form-select">
-                            <option value="active">Active</option>
-                            <option value="enter">Enter</option>
-                            <option value="leave">Leave</option>
-                            <option value="used">Used</option>
-                            <option value="expired">Expired</option>
-                        </select>
-                    </div>
-                    <div class="modal-form-group">
-                        <label for="edit_qr_code" class="modal-form-label">QR Code</label>
-                        <input type="text" id="edit_qr_code" name="qr_code" class="modal-form-input" placeholder="Auto-generated if empty">
-                    </div>
+                <div class="modal-form-group">
+                    <label for="edit_medical_card_number" class="modal-form-label">Medical Card Number *</label>
+                    <input type="text" id="edit_medical_card_number" name="medical_card_number" class="modal-form-input" required>
                 </div>
                 
-                <div class="modal-form-row">
-                    <div class="modal-form-group">
-                        <label for="edit_valid_from" class="modal-form-label">Valid From</label>
-                        <input type="datetime-local" id="edit_valid_from" name="valid_from" class="modal-form-input">
-                    </div>
-                    <div class="modal-form-group">
-                        <label for="edit_valid_till" class="modal-form-label">Valid Till</label>
-                        <input type="datetime-local" id="edit_valid_till" name="valid_till" class="modal-form-input">
-                    </div>
+                <div class="modal-form-group">
+                    <label for="edit_qr_status" class="modal-form-label">QR Status</label>
+                    <select id="edit_qr_status" name="qr_status" class="modal-form-select">
+                        <option value="">— Select Status —</option>
+                        <option value="active">Active</option>
+                        <option value="entered">Entered</option>
+                        <option value="left">Left</option>
+                        <option value="expired">Expired</option>
+                    </select>
                 </div>
+                
             </form>
         </div>
         <div class="modal-footer">
@@ -269,7 +231,7 @@ function editAppointment(appointmentId) {
     // Populate the edit form with current values
     document.getElementById('edit_appointment_id').value = appointmentId;
     
-    // Set patient
+    // Set patient name fields
     const patientNameEl = row.querySelector('.appointments-patient-name');
     if (!patientNameEl) {
         console.error('Patient name element not found');
@@ -277,73 +239,41 @@ function editAppointment(appointmentId) {
         return;
     }
     const patientName = patientNameEl.textContent.trim();
-    const patientSelect = document.getElementById('edit_patient');
-    for (let option of patientSelect.options) {
-        if (option.textContent.includes(patientName)) {
-            option.selected = true;
-            break;
+    
+    // Split the patient name into first and last name
+    const nameParts = patientName.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    document.getElementById('edit_first_name').value = firstName;
+    document.getElementById('edit_last_name').value = lastName;
+    
+    // Set medical card number
+    const medicalCardEl = row.querySelector('.appointments-medical-card');
+    if (medicalCardEl) {
+        document.getElementById('edit_medical_card_number').value = medicalCardEl.textContent.trim();
+    }
+    
+    // Set QR status
+    const qrStatusEl = row.querySelector('.qr-status-badge');
+    if (qrStatusEl) {
+        const qrStatusText = qrStatusEl.textContent.trim().toLowerCase();
+        const qrStatusSelect = document.getElementById('edit_qr_status');
+        if (qrStatusSelect) {
+            // Map display text to status values
+            const statusMap = {
+                'active': 'active',
+                'entered': 'entered',
+                'left': 'left',
+                'expired': 'expired'
+            };
+            
+            const statusValue = statusMap[qrStatusText] || qrStatusText;
+            qrStatusSelect.value = statusValue;
         }
     }
     
-    // Set doctor
-    const doctorSelect = document.getElementById('edit_doctor');
-    const doctorNameEl = row.querySelector('.appointments-doctor-name');
-    if (doctorNameEl) {
-        const doctorName = doctorNameEl.textContent.trim();
-        for (let option of doctorSelect.options) {
-            if (option.textContent.includes(doctorName)) {
-                option.selected = true;
-                break;
-            }
-        }
-    }
-    
-    // Set status
-    const statusBadge = row.querySelector('.status-badge');
-    if (statusBadge) {
-        const statusText = statusBadge.textContent.toLowerCase().trim();
-        const statusSelect = document.getElementById('edit_status');
-        
-        // Map display text to status values
-        const statusMap = {
-            'active': 'active',
-            'enter': 'enter',
-            'leave': 'leave'
-        };
-        
-        const statusValue = statusMap[statusText] || statusText;
-        statusSelect.value = statusValue;
-    }
-    
-    // Set QR code
-    const qrCodeEl = row.querySelector('.appointments-qr-code');
-    if (qrCodeEl) {
-        document.getElementById('edit_qr_code').value = qrCodeEl.textContent.trim();
-    }
-    
-    // Set validity dates (if available in the row)
-    const validFromEl = row.querySelector('.appointments-valid-from');
-    const validTillEl = row.querySelector('.appointments-valid-till');
-    
-    if (validFromEl) {
-        const validFromValue = validFromEl.textContent.trim();
-        if (validFromValue && validFromValue !== 'N/A') {
-            // Convert to datetime-local format
-            const date = new Date(validFromValue);
-            const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            document.getElementById('edit_valid_from').value = localDateTime;
-        }
-    }
-    
-    if (validTillEl) {
-        const validTillValue = validTillEl.textContent.trim();
-        if (validTillValue && validTillValue !== 'N/A') {
-            // Convert to datetime-local format
-            const date = new Date(validTillValue);
-            const localDateTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            document.getElementById('edit_valid_till').value = localDateTime;
-        }
-    }
+    // QR code is auto-generated, no need to set it
     
     // Show the modal
     document.getElementById('editAppointmentModal').style.display = 'flex';
@@ -450,24 +380,50 @@ function updateAppointmentRow(appointmentData) {
 
 // Delete Appointment Functions
 function deleteAppointment(appointmentId) {
-    currentAppointmentId = appointmentId;
-    
-    // Get appointment info for confirmation
-    const row = document.querySelector(`tr[data-appointment-id="${appointmentId}"]`);
-    const patientName = row.querySelector('.appointments-patient-name').textContent;
-    const procedureTitle = row.querySelector('.appointments-procedure-title').textContent;
-    const doctorName = row.querySelector('.appointments-doctor-name').textContent;
-    const appointmentIdText = row.querySelector('td:first-child').textContent;
-    
-    document.getElementById('deleteAppointmentInfo').innerHTML = 
-        `ID: ${appointmentIdText}<br>Patient: ${patientName}<br>Procedure: ${procedureTitle}<br>Doctor: ${doctorName}`;
-    document.getElementById('deleteAppointmentModal').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    try {
+        currentAppointmentId = appointmentId;
+        
+        // Get appointment info for confirmation
+        const row = document.querySelector(`tr[data-appointment-id="${appointmentId}"]`);
+        if (!row) {
+            showMessage('Appointment row not found', 'error');
+            return;
+        }
+        
+        const patientNameEl = row.querySelector('.appointments-patient-name');
+        const medicalCardEl = row.querySelector('.appointments-medical-card');
+        const appointmentIdEl = row.querySelector('td:first-child');
+        
+        // Safely get text content
+        const patientName = patientNameEl ? patientNameEl.textContent.trim() : 'Unknown';
+        const medicalCard = medicalCardEl ? medicalCardEl.textContent.trim() : 'Unknown';
+        const appointmentIdText = appointmentIdEl ? appointmentIdEl.textContent.trim() : appointmentId;
+        
+        const deleteInfoEl = document.getElementById('deleteAppointmentInfo');
+        if (deleteInfoEl) {
+            deleteInfoEl.innerHTML = 
+                `ID: ${appointmentIdText}<br>Patient: ${patientName}<br>Medical Card: ${medicalCard}`;
+        }
+        
+        const modalEl = document.getElementById('deleteAppointmentModal');
+        if (modalEl) {
+            modalEl.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        } else {
+            showMessage('Delete modal not found', 'error');
+        }
+        
+    } catch (error) {
+        showMessage('Error opening delete confirmation: ' + error.message, 'error');
+    }
 }
 
 function closeDeleteAppointmentModal() {
-    document.getElementById('deleteAppointmentModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
+    const modalEl = document.getElementById('deleteAppointmentModal');
+    if (modalEl) {
+        modalEl.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
     currentAppointmentId = null;
 }
 
@@ -485,7 +441,6 @@ function confirmDeleteAppointment() {
     }
     
     const deleteUrl = `{% url "medical_access:delete_appointment" 0 %}`.replace('0', currentAppointmentId);
-    console.log('Deleting appointment:', currentAppointmentId, 'URL:', deleteUrl);
     
     fetch(deleteUrl, {
         method: 'POST',
@@ -495,14 +450,12 @@ function confirmDeleteAppointment() {
         }
     })
     .then(response => {
-        console.log('Delete response status:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Delete response data:', data);
         if (data.success) {
             showMessage(data.message, 'success');
             closeDeleteAppointmentModal();
@@ -514,7 +467,7 @@ function confirmDeleteAppointment() {
             // Check if table is empty
             const tbody = document.querySelector('tbody');
             if (tbody.children.length === 0) {
-                tbody.innerHTML = '<tr class="appointments-table-row"><td colspan="7" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td></tr>';
+                tbody.innerHTML = '<tr class="appointments-table-row"><td colspan="5" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td></tr>';
             }
         } else {
             showMessage(data.message || 'Failed to delete appointment', 'error');
@@ -534,22 +487,26 @@ function searchAppointments() {
     const rows = document.querySelectorAll('.appointments-table-row[data-appointment-id]');
     
     rows.forEach(row => {
-        const patientName = row.querySelector('.appointments-patient-name').textContent.toLowerCase();
-        const patientPhone = row.querySelector('.appointments-patient-phone')?.textContent.toLowerCase() || '';
-        const status = row.querySelector('.status-badge').textContent.toLowerCase();
+        const patientNameEl = row.querySelector('.appointments-patient-name');
+        const medicalCardEl = row.querySelector('.appointments-medical-card');
+        const qrStatusEl = row.querySelector('.qr-status-badge');
+        
+        const patientName = patientNameEl ? patientNameEl.textContent.toLowerCase() : '';
+        const medicalCard = medicalCardEl ? medicalCardEl.textContent.toLowerCase() : '';
+        const qrStatus = qrStatusEl ? qrStatusEl.textContent.toLowerCase() : '';
         
         let showRow = true;
         
         // Search filter
-        if (searchTerm && !patientName.includes(searchTerm) && !patientPhone.includes(searchTerm)) {
+        if (searchTerm && !patientName.includes(searchTerm) && !medicalCard.includes(searchTerm)) {
             showRow = false;
         }
         
-        // Status filter
+        // QR Status filter
         if (statusFilter !== 'all') {
-            if (statusFilter === 'active' && !status.includes('active')) showRow = false;
-            if (statusFilter === 'enter' && !status.includes('enter')) showRow = false;
-            if (statusFilter === 'leave' && !status.includes('leave')) showRow = false;
+            if (statusFilter === 'active' && !qrStatus.includes('active')) showRow = false;
+            if (statusFilter === 'enter' && !qrStatus.includes('entered')) showRow = false;
+            if (statusFilter === 'leave' && !qrStatus.includes('left')) showRow = false;
         }
         
         row.style.display = showRow ? '' : 'none';
@@ -588,14 +545,16 @@ function exportToCSV() {
     
     rows.forEach(row => {
         if (row.style.display !== 'none') {
-            const id = row.cells[0].textContent;
-            const patient = row.querySelector('.appointments-patient-name').textContent;
-            const procedure = row.querySelector('.appointments-procedure-title').textContent;
-            const doctor = row.querySelector('.appointments-doctor-name').textContent;
-            const sum = row.querySelector('.appointments-price').textContent;
-            const status = row.querySelector('.status-badge').textContent;
+            const id = row.cells[0] ? row.cells[0].textContent : '';
+            const patientEl = row.querySelector('.appointments-patient-name');
+            const medicalCardEl = row.querySelector('.appointments-medical-card');
+            const statusEl = row.querySelector('.status-badge');
             
-            csv += `${id},"${patient}","${procedure}","${doctor}","${sum}","${status}"\n`;
+            const patient = patientEl ? patientEl.textContent : 'Unknown';
+            const medicalCard = medicalCardEl ? medicalCardEl.textContent : 'Unknown';
+            const status = statusEl ? statusEl.textContent : 'Unknown';
+            
+            csv += `${id},"${patient}","${medicalCard}","N/A","N/A","${status}"\n`;
         }
     });
     

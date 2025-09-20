@@ -9,16 +9,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', "django-insecure-hbyaqg!x@ykw_pb7!cwil4_&39itz+w)wc3-9e7pgmoyd$=(c_")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.100.133,localhost,127.0.0.1,0.0.0.0').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '192.168.100.133,192.168.100.237,192.168.31.135,localhost,127.0.0.1,0.0.0.0').split(',')
 
 # Proxy configuration for Docker/Nginx
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Security headers for development
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # Disable COOP for development
+SECURE_REFERRER_POLICY = None  # Disable referrer policy for development
+
 # CSRF Configuration - only for browser use, not for terminals
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://192.168.100.133:8000,http://localhost:8000,http://127.0.0.1:8000').split(',')
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://192.168.100.133:8000,http://192.168.100.237:8000,http://192.168.31.135:8000,http://localhost:8000,http://127.0.0.1:8000').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -176,7 +180,7 @@ SIMPLE_JWT = {
 
 # PayVerify / Terminals config
 PAYVERIFY_TERMINAL_TIMEOUT = 5           # seconds
-PAYVERIFY_TERMINAL_SUBNET = "192.168.100."
+PAYVERIFY_TERMINAL_SUBNET = "192.168.31."  # Updated for office network
 PAYVERIFY_EVENT_STREAM_CONNECT = True    # enables event listener to auto-connect
 
 # Logging Configuration

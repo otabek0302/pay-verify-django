@@ -8,10 +8,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Integration, Patient, Doctor, Appointment, QRCode
+from .models import Integration, Patient, Appointment, QRCode
 
 logger = logging.getLogger("medical_access.api")
 
@@ -32,7 +31,13 @@ def validate_integration_token(token):
 @require_POST
 def create_appointment_api(request):
     """
-    API endpoint for external platforms to create appointments.
+    API endpoint for external partners to create appointments.
+    
+    Workflow:
+    1. Partner sends patient data with their integration token
+    2. PayVerify creates appointment and returns QR code
+    3. Partner generates QR code on their side using the returned code
+    4. QR code validation happens when scanned at terminal
     
     Expected JSON payload:
     {
@@ -40,15 +45,7 @@ def create_appointment_api(request):
         "patient": {
             "first_name": "John",
             "last_name": "Doe", 
-            "phone": "+1234567890",
-            "passport_series": "AB",
-            "passport_number": "1234567"
-        },
-        "doctor": {
-            "first_name": "Dr. Jane",
-            "last_name": "Smith",
-            "procedure": "General Consultation",
-            "price": 100.00
+            "medical_card_number": "MC1234567"
         },
         "appointment_duration_hours": 24  # Optional, defaults to 24
     }
@@ -57,8 +54,10 @@ def create_appointment_api(request):
     {
         "success": true,
         "appointment_id": 123,
-        "qr_code": "ABC123XYZ789",
+        "qr_code": "ABC123XYZ789",  # Use this to generate QR code on your side
         "expires_at": "2025-09-11T18:32:15Z",
+        "patient_name": "John Doe",
+        "patient_medical_card": "MC1234567",
         "message": "Appointment created successfully"
     }
     """
@@ -85,12 +84,6 @@ def create_appointment_api(request):
                 "error": "Patient information is required"
             }, status=400)
         
-        if not data.get("doctor"):
-            return JsonResponse({
-                "success": False,
-                "error": "Doctor information is required"
-            }, status=400)
-        
         # Validate integration token
         integration, token_error = validate_integration_token(data["token"])
         if not integration:
@@ -103,34 +96,13 @@ def create_appointment_api(request):
         
         # Extract patient data
         patient_data = data["patient"]
-        required_patient_fields = ["first_name", "last_name"]
+        required_patient_fields = ["first_name", "last_name", "medical_card_number"]
         for field in required_patient_fields:
             if not patient_data.get(field):
                 return JsonResponse({
                     "success": False,
                     "error": f"Patient {field} is required"
                 }, status=400)
-        
-        # Extract doctor data
-        doctor_data = data["doctor"]
-        required_doctor_fields = ["first_name", "last_name", "procedure", "price"]
-        for field in required_doctor_fields:
-            if not doctor_data.get(field):
-                return JsonResponse({
-                    "success": False,
-                    "error": f"Doctor {field} is required"
-                }, status=400)
-        
-        # Validate price
-        try:
-            price = float(doctor_data["price"])
-            if price <= 0:
-                raise ValueError("Price must be greater than 0")
-        except (ValueError, TypeError):
-            return JsonResponse({
-                "success": False,
-                "error": "Doctor price must be a positive number"
-            }, status=400)
         
         # Get appointment duration (default 24 hours)
         duration_hours = data.get("appointment_duration_hours", 24)
@@ -147,12 +119,10 @@ def create_appointment_api(request):
         # Create or get patient
         with transaction.atomic():
             patient, created = Patient.objects.get_or_create(
-                first_name=patient_data["first_name"],
-                last_name=patient_data["last_name"],
+                medical_card_number=patient_data["medical_card_number"],
                 defaults={
-                    "phone": patient_data.get("phone", ""),
-                    "passport_series": patient_data.get("passport_series", ""),
-                    "passport_number": patient_data.get("passport_number", ""),
+                    "first_name": patient_data["first_name"],
+                    "last_name": patient_data["last_name"],
                 }
             )
             
@@ -161,25 +131,9 @@ def create_appointment_api(request):
             else:
                 logger.info(f"API: Using existing patient: {patient.full_name}")
             
-            # Create or get doctor
-            doctor, created = Doctor.objects.get_or_create(
-                first_name=doctor_data["first_name"],
-                last_name=doctor_data["last_name"],
-                defaults={
-                    "procedure": doctor_data["procedure"],
-                    "price": price,
-                }
-            )
-            
-            if created:
-                logger.info(f"API: Created new doctor: {doctor.full_name}")
-            else:
-                logger.info(f"API: Using existing doctor: {doctor.full_name}")
-            
             # Create appointment
             appointment = Appointment.objects.create(
-                patient=patient,
-                doctor=doctor
+                patient=patient
             )
             
             # Create QR code
@@ -197,9 +151,7 @@ def create_appointment_api(request):
                 "qr_code": qr_code.code,
                 "expires_at": qr_code.expires_at.isoformat(),
                 "patient_name": patient.full_name,
-                "doctor_name": doctor.full_name,
-                "procedure": doctor.procedure,
-                "price": float(doctor.price),
+                "patient_medical_card": patient.medical_card_number,
                 "message": "Appointment created successfully"
             })
     
@@ -217,6 +169,9 @@ def validate_qr_code_api(request):
     """
     API endpoint to validate QR codes and get appointment details.
     
+    This endpoint validates QR codes that were generated by partners
+    using the qr_code returned from create_appointment_api.
+    
     Expected JSON payload:
     {
         "token": "your_integration_token",
@@ -227,14 +182,17 @@ def validate_qr_code_api(request):
     {
         "success": true,
         "valid": true,
+        "qr_code": "ABC123XYZ789",
+        "status": "active",
+        "expires_at": "2025-09-11T18:32:15Z",
+        "revoked": false,
         "appointment": {
             "id": 123,
             "patient_name": "John Doe",
-            "doctor_name": "Dr. Jane Smith",
-            "procedure": "General Consultation",
-            "status": "active",
-            "expires_at": "2025-09-11T18:32:15Z"
-        }
+            "patient_medical_card": "MC1234567",
+            "created_at": "2025-09-10T10:30:00Z"
+        },
+        "message": "QR code is valid"
     }
     """
     try:
@@ -270,7 +228,7 @@ def validate_qr_code_api(request):
         
         # Find QR code
         try:
-            qr_code = QRCode.objects.select_related('appointment__patient', 'appointment__doctor').get(
+            qr_code = QRCode.objects.select_related('appointment__patient').get(
                 code=data["qr_code"]
             )
         except QRCode.DoesNotExist:
@@ -280,8 +238,38 @@ def validate_qr_code_api(request):
                 "message": "QR code not found"
             })
         
-        # Check if QR code is valid
+        # Check if QR code is valid (not expired or revoked)
         is_valid = qr_code.is_valid
+        
+        # Get terminal mode from request (if provided)
+        terminal_mode = data.get("terminal_mode", "").lower()
+        
+        # Update status based on terminal mode and current status
+        status_changed = False
+        if is_valid:
+            if terminal_mode:
+                # Physical terminal mode - explicit enter/exit commands
+                if terminal_mode == "enter":
+                    if qr_code.status == QRCode.Status.ACTIVE:
+                        qr_code.status = QRCode.Status.ENTERED
+                        qr_code.save()
+                        status_changed = True
+                elif terminal_mode == "exit" or terminal_mode == "leave":
+                    if qr_code.status == QRCode.Status.ENTERED:
+                        qr_code.status = QRCode.Status.LEFT
+                        qr_code.save()
+                        status_changed = True
+            else:
+                # PC/Mobile browser mode - automatic status progression
+                if qr_code.status == QRCode.Status.ACTIVE:
+                    qr_code.status = QRCode.Status.ENTERED
+                    qr_code.save()
+                    status_changed = True
+                elif qr_code.status == QRCode.Status.ENTERED:
+                    qr_code.status = QRCode.Status.LEFT
+                    qr_code.save()
+                    status_changed = True
+                # If already LEFT, don't change status
         
         response_data = {
             "success": True,
@@ -296,14 +284,35 @@ def validate_qr_code_api(request):
             response_data["appointment"] = {
                 "id": qr_code.appointment.id,
                 "patient_name": qr_code.appointment.patient.full_name,
-                "doctor_name": qr_code.appointment.doctor.full_name,
-                "procedure": qr_code.appointment.doctor.procedure,
-                "price": float(qr_code.appointment.doctor.price),
+                "patient_medical_card": qr_code.appointment.patient.medical_card_number,
                 "created_at": qr_code.appointment.created_at.isoformat()
             }
-            response_data["message"] = "QR code is valid"
+            
+            # Set appropriate message based on status and terminal mode
+            if terminal_mode:
+                # Physical terminal mode - show status changes
+                if qr_code.status == QRCode.Status.ENTERED and status_changed:
+                    response_data["message"] = "SUCCESS: Patient ENTERED"
+                elif qr_code.status == QRCode.Status.LEFT and status_changed:
+                    response_data["message"] = "SUCCESS: Patient LEFT"
+                elif qr_code.status == QRCode.Status.ENTERED:
+                    response_data["message"] = "Patient already ENTERED"
+                elif qr_code.status == QRCode.Status.LEFT:
+                    response_data["message"] = "Patient already LEFT"
+                else:
+                    response_data["message"] = "QR code is valid"
+            else:
+                # PC/Mobile browser mode - simple validation
+                if qr_code.status == QRCode.Status.ACTIVE:
+                    response_data["message"] = "QR Code Valid - Ready for Entry"
+                elif qr_code.status == QRCode.Status.ENTERED:
+                    response_data["message"] = "QR Code Valid - Patient Entered"
+                elif qr_code.status == QRCode.Status.LEFT:
+                    response_data["message"] = "QR Code Valid - Patient Left"
+                else:
+                    response_data["message"] = "QR code is valid"
         else:
-            response_data["message"] = "QR code is expired or revoked"
+            response_data["message"] = "INVALID: QR code is expired or revoked"
         
         return JsonResponse(response_data)
     

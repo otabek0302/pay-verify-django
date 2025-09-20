@@ -20,20 +20,12 @@
     <!-- Statistics Cards Section -->
     <div class="dashboard-stats-grid">
         <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Revenue ({{ period_label }})</div>
-            <div class="dashboard-stat-card-value">{{ statistics.period_revenue }} sum</div>
-        </div>
-        <div class="dashboard-stat-card">
             <div class="dashboard-stat-card-title">Appointments ({{ period_label }})</div>
             <div class="dashboard-stat-card-value">{{ statistics.period_receipts }}</div>
         </div>
         <div class="dashboard-stat-card">
             <div class="dashboard-stat-card-title">Active QR Codes</div>
             <div class="dashboard-stat-card-value">{{ statistics.active_appointments }}</div>
-        </div>
-        <div class="dashboard-stat-card">
-            <div class="dashboard-stat-card-title">Total Doctors</div>
-            <div class="dashboard-stat-card-value">{{ statistics.active_doctors }}</div>
         </div>
         <div class="dashboard-stat-card">
             <div class="dashboard-stat-card-title">Total Patients</div>
@@ -60,7 +52,7 @@
                         <th class="table-header">Appointment ID</th>
                         <th class="table-header">Date</th>
                         <th class="table-header">Patient</th>
-                        <th class="table-header">Doctor</th>
+                        <th class="table-header">Medical Card</th>
                         <th class="table-header">Status</th>
                         <th class="table-header">Action</th>
                     </tr>
@@ -71,9 +63,9 @@
                     <td class="table-cell">#APT{{ appointment.id|stringformat:"03d" }}</td>
                     <td class="table-cell">{{ appointment.created_at|date:"M d, Y" }}</td>
                     <td class="table-cell">{{ appointment.patient.full_name }}</td>
-                    <td class="table-cell">{{ appointment.doctor.full_name }}</td>
+                    <td class="table-cell">{{ appointment.patient.medical_card_number }}</td>
                     <td class="table-cell">
-                        <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
+                        <span class="status-badge status-badge--{{ appointment.qr_code.status }}">{{ appointment.qr_code.get_status_display }}</span>
                     </td>
                     <td class="table-cell">
                         <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="table-link">View Details</a>

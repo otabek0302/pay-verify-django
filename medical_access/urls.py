@@ -12,8 +12,6 @@ urlpatterns = [
     path('dashboard/', views.dashboard_view, name='dashboard'),
 
     path('patient-registration/', views.patient_registration_view, name='patient_registration'),
-    path('doctors/', views.doctors_view, name='doctors'),
-    path('patients/', views.patients_view, name='patients'),
     path('appointments/', views.appointments_view, name='appointments'),
 
     path('appointment/<int:appointment_id>/', views.appointment_detail, name='appointment_detail'),
@@ -29,18 +27,8 @@ urlpatterns = [
 
     # API endpoints (CRUD)
     path('create-appointment/', views.create_appointment, name='create_appointment'),
-    path('create-doctor/', views.create_doctor, name='create_doctor'),
     path('create-patient/', views.create_patient, name='create_patient'),
 
-    # Doctor CRUD
-    path('doctors/<int:doctor_id>/', views.get_doctor, name='get_doctor'),
-    path('update-doctor/<int:doctor_id>/', views.update_doctor, name='update_doctor'),
-    path('delete-doctor/<int:doctor_id>/', views.delete_doctor, name='delete_doctor'),
-
-    # Patient CRUD
-    path('patients/<int:patient_id>/', views.get_patient, name='get_patient'),
-    path('patients/<int:patient_id>/update/', views.update_patient, name='update_patient'),
-    path('patients/<int:patient_id>/delete/', views.delete_patient, name='delete_patient'),
 
     # Appointment CRUD
     path('appointments/<int:appointment_id>/update/', views.update_appointment, name='update_appointment'),
@@ -58,4 +46,7 @@ urlpatterns = [
     # External API endpoints
     path('api/create-appointment/', create_appointment_api, name='api_create_appointment'),
     path('api/validate-qr/', validate_qr_code_api, name='api_validate_qr'),
+    
+    # Health check endpoint for terminal testing
+    path('health/', views.health_check, name='health_check'),
 ]

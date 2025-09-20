@@ -175,15 +175,6 @@
     font-weight: 400;
 }
 
-.appointment-detail-card-number {
-    font-family: 'Courier New', monospace;
-    background: #f1f5f9;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 14px;
-    color: var(--primary-color);
-    font-weight: 700;
-}
 
 /* QR Section */
 .appointment-detail-qr-section {

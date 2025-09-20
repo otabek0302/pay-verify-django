@@ -247,11 +247,18 @@
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert"
+            });
 
-            if (code) {
-                verifyQRCode(code.data);
-                return;
+            if (code && code.data && code.data.length > 0) {
+                // Validate that it looks like a QR code (not a face)
+                // QR codes typically have alphanumeric data
+                const qrData = code.data.trim();
+                if (qrData.length >= 8 && /^[A-Z0-9]+$/.test(qrData)) {
+                    verifyQRCode(qrData);
+                    return;
+                }
             }
         }
 
@@ -266,20 +273,37 @@
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         try {
-            const response = await fetch(`/medical_access/verify-appointment/${qrData}/`, {
-                method: "GET",
+            const response = await fetch(`/medical_access/api/validate-qr/`, {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
+                body: JSON.stringify({
+                    token: "776b7cfae1908878f78ba5a9084f660498feea87bb0c679492e97de3529a16a8",
+                    qr_code: qrData
+                })
             });
 
             const data = await response.json();
             hideLoading();
 
-            if (data.success) {
-                showResult("GRANTED", "Access Granted!", data.appointment.patient.full_name, data.appointment.doctor.procedure, true);
+            if (data.success && data.valid) {
+                // Show success message based on status
+                if (data.message.includes("SUCCESS")) {
+                    showResult("SUCCESS", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("already")) {
+                    showResult("INFO", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("Patient Entered")) {
+                    showResult("SUCCESS", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("Patient Left")) {
+                    showResult("INFO", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else {
+                    showResult("GRANTED", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                }
             } else {
-                showResult("DENIED", "Access Denied", data.message || "Invalid QR code", "", false);
+                // Show error message
+                const errorMsg = data.message || "Invalid QR code";
+                showResult("DENIED", "Access Denied", errorMsg, "", false);
             }
 
             // Auto restart scanning after 5 seconds
@@ -301,12 +325,28 @@
     }
 
     function showResult(type, title, subtitle, procedure, granted) {
-        result.className = `kiosk-result ${granted ? "granted" : "denied"}`;
-        resultText.textContent = title;
-        resultSubtitle.textContent = granted ? "Access Granted" : "Access Denied";
+        // Set CSS class based on result type
+        let resultClass = "kiosk-result";
+        if (type === "SUCCESS") {
+            resultClass += " success";
+        } else if (type === "INFO") {
+            resultClass += " info";
+        } else if (type === "GRANTED") {
+            resultClass += " granted";
+        } else {
+            resultClass += " denied";
+        }
         
-        // Set appropriate icon
-        if (granted) {
+        result.className = resultClass;
+        resultText.textContent = title;
+        resultSubtitle.textContent = subtitle || (granted ? "Access Granted" : "Access Denied");
+        
+        // Set appropriate icon based on type
+        if (type === "SUCCESS") {
+            resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else if (type === "INFO") {
+            resultIcon.innerHTML = '<i class="fas fa-info-circle"></i>';
+        } else if (type === "GRANTED") {
             resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
         } else {
             resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
@@ -337,7 +377,7 @@
         }
 
         result.style.display = "block";
-        updateStatus(granted ? "Access Granted" : "Access Denied", granted ? "success" : "error");
+        updateStatus(granted ? title : "Access Denied", granted ? "success" : "error");
         stopScanning();
     }
 

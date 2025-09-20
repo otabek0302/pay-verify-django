@@ -445,6 +445,13 @@
     outline: none;
 }
 
+.modal-form-help {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-style: italic;
+}
+
 .appointments-modal-checkbox-label {
     display: flex;
     align-items: center;

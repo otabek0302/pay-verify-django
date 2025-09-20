@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from django.core.validators import MinValueValidator, RegexValidator
+from django.core.validators import RegexValidator
 from django.contrib.auth.models import AbstractUser
 import secrets
 import string
@@ -39,47 +39,14 @@ class User(AbstractUser):
         return f"{self.first_name} {self.last_name}".strip()
 
 
-class Doctor(models.Model):
-    first_name = models.CharField(max_length=50, default="")
-    last_name = models.CharField(max_length=50, default="")
-    procedure = models.CharField(max_length=160, default="General Consultation")
-    price = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        default=0.00,
-        validators=[MinValueValidator(0.01, "Price must be greater than 0")],
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "Doctor"
-        verbose_name_plural = "Doctors"
-        ordering = ["last_name", "first_name"]
-
-    def __str__(self):
-        return f"Dr. {self.full_name}"
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}".strip()
-
-
 class Patient(models.Model):
     first_name = models.CharField(max_length=50, default="")
     last_name = models.CharField(max_length=50, default="")
-    passport_series = models.CharField(max_length=10, blank=True, null=True, default="")
-    passport_number = models.CharField(max_length=20, blank=True, null=True, default="")
-    phone = models.CharField(
+    medical_card_number = models.CharField(
         max_length=20,
-        blank=True,
-        null=True,
-        validators=[
-            RegexValidator(
-                regex=r"^\+?1?\d{9,15}$",
-                message="Phone number must be entered in the format: +999999999. Up to 15 digits allowed.",
-            )
-        ],
+        unique=True,
+        default="TEMP_CARD",
+        help_text="Unique medical card number for the patient"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -98,10 +65,8 @@ class Patient(models.Model):
 
     @property
     def display_name(self):
-        """Display name with phone if available"""
-        if self.phone:
-            return f"{self.full_name} ({self.phone})"
-        return self.full_name
+        """Display name with medical card number"""
+        return f"{self.full_name} ({self.medical_card_number})"
 
 
 class Integration(models.Model):
@@ -110,14 +75,11 @@ class Integration(models.Model):
         unique=True,
         help_text="Integration name (e.g., DMED, RemoteJobs)",
     )
-    api_url = models.URLField(
-        blank=True, null=True, help_text="Base API endpoint if needed"
-    )
     api_token = models.CharField(
         max_length=255,
         unique=True,
         editable=False,
-        help_text="Auto-generated secure token",
+        help_text="Auto-generated secure token for partner authentication",
     )
     is_active = models.BooleanField(
         default=True, help_text="Enable/disable this integration"
@@ -150,9 +112,6 @@ class Appointment(models.Model):
     patient = models.ForeignKey(
         "Patient", on_delete=models.DO_NOTHING, related_name="appointments"
     )
-    doctor = models.ForeignKey(
-        "Doctor", on_delete=models.DO_NOTHING, related_name="appointments"
-    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -163,7 +122,7 @@ class Appointment(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.patient.full_name} - {self.doctor.procedure}"
+        return f"{self.patient.full_name} - Appointment #{self.id}"
 
 
 class QRCode(models.Model):
@@ -205,7 +164,7 @@ class QRCode(models.Model):
         return (
             (not self.revoked)
             and self.expires_at > now
-            and self.status in [self.Status.ACTIVE, self.Status.ENTERED]
+            and self.status in [self.Status.ACTIVE, self.Status.ENTERED, self.Status.LEFT]
         )
 
 

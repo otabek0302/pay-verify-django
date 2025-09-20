@@ -29,7 +29,6 @@
                     <i class="fas fa-info-circle"></i>
                     Appointment Information
                 </h2>
-                <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
             </div>
             
             <div class="appointment-detail-info-grid">
@@ -40,31 +39,16 @@
                     <div class="appointment-detail-info-content">
                         <label class="appointment-detail-info-label">Patient</label>
                         <span class="appointment-detail-info-value">{{ appointment.patient.full_name }}</span>
-                        {% if appointment.patient.phone %}
-                            <small class="appointment-detail-info-meta">{{ appointment.patient.phone }}</small>
-                        {% endif %}
                     </div>
                 </div>
                 
                 <div class="appointment-detail-info-item">
                     <div class="appointment-detail-info-icon">
-                        <i class="fas fa-user-md"></i>
+                        <i class="fas fa-id-card"></i>
                     </div>
                     <div class="appointment-detail-info-content">
-                        <label class="appointment-detail-info-label">Doctor</label>
-                        <span class="appointment-detail-info-value">Dr. {{ appointment.doctor.full_name }}</span>
-                        <small class="appointment-detail-info-meta">{{ appointment.doctor.procedure }}</small>
-                    </div>
-                </div>
-                
-                <div class="appointment-detail-info-item">
-                    <div class="appointment-detail-info-icon">
-                        <i class="fas fa-procedures"></i>
-                    </div>
-                    <div class="appointment-detail-info-content">
-                        <label class="appointment-detail-info-label">Procedure</label>
-                        <span class="appointment-detail-info-value">{{ appointment.doctor.procedure }}</span>
-                        <small class="appointment-detail-info-meta">{{ appointment.doctor.price }} sum</small>
+                        <label class="appointment-detail-info-label">Medical Card</label>
+                        <span class="appointment-detail-info-value">{{ appointment.patient.medical_card_number }}</span>
                     </div>
                 </div>
                 
@@ -79,35 +63,7 @@
                     </div>
                 </div>
                 
-                {% if appointment.card_number %}
-                <div class="appointment-detail-info-item">
-                    <div class="appointment-detail-info-icon">
-                        <i class="fas fa-credit-card"></i>
-                    </div>
-                    <div class="appointment-detail-info-content">
-                        <label class="appointment-detail-info-label">Card Number</label>
-                        <span class="appointment-detail-info-value appointment-detail-card-number">{{ appointment.card_number }}</span>
-                        <small class="appointment-detail-info-meta">Access Card</small>
-                    </div>
-                </div>
-                {% endif %}
                 
-                {% if appointment.valid_from and appointment.valid_till %}
-                <div class="appointment-detail-info-item">
-                    <div class="appointment-detail-info-icon">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="appointment-detail-info-content">
-                        <label class="appointment-detail-info-label">Validity Period</label>
-                        <span class="appointment-detail-info-value">
-                            {{ appointment.valid_from|date:"M d, Y g:i A" }}
-                        </span>
-                        <small class="appointment-detail-info-meta">
-                            Until {{ appointment.valid_till|date:"M d, Y g:i A" }}
-                        </small>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
         
@@ -156,12 +112,6 @@
                             <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.expires_at|date:"M d, Y g:i A" }}</span>
                         </div>
                         
-                        {% if appointment.qr_code.used_at %}
-                        <div class="appointment-detail-qr-info-item">
-                            <label class="appointment-detail-qr-info-label">Last Used</label>
-                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.used_at|date:"M d, Y g:i A" }}</span>
-                        </div>
-                        {% endif %}
                     </div>
                     
                     <div class="appointment-detail-qr-actions">
@@ -169,7 +119,6 @@
                             <i class="fas fa-print"></i>
                             Print Receipt
                         </a>
-                        {% if appointment.status == 'active' %}
                         <form method="post" action="{% url 'medical_access:create_qr' appointment.id %}" class="appointment-detail-qr-form">
                             {% csrf_token %}
                             <button type="submit" class="appointment-detail-btn appointment-detail-btn--primary">
@@ -177,10 +126,9 @@
                                 Regenerate QR Code
                             </button>
                         </form>
-                        {% endif %}
                     </div>
                 </div>
-            {% elif appointment.status == 'active' %}
+            {% else %}
                 <div class="appointment-detail-qr-section">
                     <div class="appointment-detail-qr-info">
                         <p class="appointment-detail-qr-description">
@@ -202,11 +150,6 @@
                         </a>
                     </div>
                 </div>
-            {% else %}
-                <div class="appointment-detail-alert appointment-detail-alert--warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>This appointment is {{ appointment.get_status_display|lower }} and cannot generate a QR code.</p>
-                </div>
             {% endif %}
         </div>
         
@@ -215,14 +158,6 @@
             <a href="{% url 'medical_access:appointments' %}" class="appointment-detail-action-btn">
                 <i class="fas fa-list"></i>
                 View All Appointments
-            </a>
-            <a href="{% url 'medical_access:patients' %}" class="appointment-detail-action-btn">
-                <i class="fas fa-users"></i>
-                View Patients
-            </a>
-            <a href="{% url 'medical_access:doctors' %}" class="appointment-detail-action-btn">
-                <i class="fas fa-user-md"></i>
-                View Doctors
             </a>
         </div>
     </div>

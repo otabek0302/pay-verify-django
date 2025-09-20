@@ -71,7 +71,7 @@ def validate_qr_and_open_door(request, terminal_id: int):
     # Find appointment with this QR code
     now = timezone.now()
     appointment = (
-        Appointment.objects.select_related("patient", "doctor", "qr_code")
+        Appointment.objects.select_related("patient", "qr_code")
         .filter(
             qr_code__code=qr_code,
             qr_code__status__in=[
@@ -102,7 +102,7 @@ def validate_qr_and_open_door(request, terminal_id: int):
                 "appointment": {
                     "id": appointment.id,
                     "patient": appointment.patient.full_name,
-                    "doctor": appointment.doctor.full_name,
+                    "patient_medical_card": appointment.patient.medical_card_number,
                     "status": current_status,
                 },
             },
@@ -126,7 +126,7 @@ def validate_qr_and_open_door(request, terminal_id: int):
                 "appointment": {
                     "id": appointment.id,
                     "patient": appointment.patient.full_name,
-                    "doctor": appointment.doctor.full_name,
+                    "patient_medical_card": appointment.patient.medical_card_number,
                     "status": appointment.qr_code.status,
                 },
             },
@@ -140,7 +140,7 @@ def validate_qr_and_open_door(request, terminal_id: int):
             "appointment": {
                 "id": appointment.id,
                 "patient": appointment.patient.full_name,
-                "doctor": appointment.doctor.full_name,
+                "patient_medical_card": appointment.patient.medical_card_number,
                 "status": appointment.qr_code.status,
             },
         }
@@ -148,16 +148,26 @@ def validate_qr_and_open_door(request, terminal_id: int):
 
 
 def _hik_xml_response(ok: bool, description: str = "OK"):
-    # Minimal ResponseStatus for AcsEvent to avoid device-side timeout displays.
-    # Many firmwares accept this as an acknowledgement; we still execute local relay via open_door.
-    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+    # Simple Hikvision ResponseStatus format for AcsEvent
+    if ok:
+        body = """<?xml version="1.0" encoding="UTF-8"?>
 <ResponseStatus version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
     <requestURL>/ISAPI/AccessControl/AcsEvent</requestURL>
-    <statusCode>{1 if ok else 1}</statusCode>
+    <statusCode>1</statusCode>
     <statusString>OK</statusString>
-    <subStatusCode>{"success" if ok else "fail"}</subStatusCode>
-    <errorCode>{200 if ok else 200}</errorCode>
-    <description>{description}</description>
+    <subStatusCode>success</subStatusCode>
+    <errorCode>200</errorCode>
+    <description>Access granted</description>
+</ResponseStatus>"""
+    else:
+        body = """<?xml version="1.0" encoding="UTF-8"?>
+<ResponseStatus version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+    <requestURL>/ISAPI/AccessControl/AcsEvent</requestURL>
+    <statusCode>4</statusCode>
+    <statusString>Invalid Operation</statusString>
+    <subStatusCode>fail</subStatusCode>
+    <errorCode>400</errorCode>
+    <description>Access denied</description>
 </ResponseStatus>"""
     return HttpResponse(body, content_type="application/xml; charset=UTF-8", status=200)
 
@@ -234,6 +244,13 @@ def hik_event_receiver(request):
                 )
                 if term:
                     logger.info("HIK: terminal identified by request IP: %s/%s -> %s", xff, remote, term.terminal_name)
+            
+            # Priority 4: If no terminal found and this is an AccessControllerEvent, 
+            # use the most recently active terminal (fallback for events without MAC)
+            if not term and event_type == "accesscontrollerevent":
+                term = Terminal.objects.filter(active=True).order_by('-last_seen').first()
+                if term:
+                    logger.info("HIK: terminal identified by most recent activity: %s", term.terminal_name)
 
             if not term:
                 # Unknown device → OK and move on to next payload (don't spam warnings)
@@ -250,10 +267,11 @@ def hik_event_receiver(request):
             # Process only access verify events (major==5 on many firmwares), but
             # we'll still accept if QR exists to be resilient across variants.
             mode = (term.mode or "").lower()
+            logger.info("HIK: terminal mode: %s (original: %s)", mode, term.mode)
 
             appt = (
                 Appointment.objects
-                .select_related("patient", "doctor", "qr_code")
+                .select_related("patient", "qr_code")
                 .filter(
                     qr_code__code=qr,
                     qr_code__status__in=[QRCode.Status.ACTIVE, QRCode.Status.ENTERED, QRCode.Status.LEFT],
@@ -262,49 +280,71 @@ def hik_event_receiver(request):
                 .first()
             )
             if not appt:
-                # Return XML deny so device doesn't show timeout; just no access
+                # Return JSON deny for Sync mode terminal
                 logger.info("HIK: invalid/expired QR from %s (%s) payload=%s",
                             term.terminal_name, term.terminal_ip, qr)
-                return _hik_xml_response(False, "Access denied (invalid or expired)")
+                return JsonResponse({
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "authResult": 1  # 0=pass, 1=fail
+                    }
+                })
 
             current = appt.qr_code.status
             next_status = None
+            logger.info("HIK: status transition - current: %s, mode: %s", current, mode)
+            
             if mode == "entry" and current == QRCode.Status.ACTIVE:
                 next_status = QRCode.Status.ENTERED
+                logger.info("HIK: entry mode transition: %s -> %s", current, next_status)
             elif mode == "exit" and current == QRCode.Status.ENTERED:
                 next_status = QRCode.Status.LEFT
+                logger.info("HIK: exit mode transition: %s -> %s", current, next_status)
             elif mode not in ("entry", "exit"):  # both
                 if current == QRCode.Status.ACTIVE:
                     next_status = QRCode.Status.ENTERED
+                    logger.info("HIK: both mode transition: %s -> %s", current, next_status)
                 elif current == QRCode.Status.ENTERED:
                     next_status = QRCode.Status.LEFT
+                    logger.info("HIK: both mode transition: %s -> %s", current, next_status)
 
             if not next_status:
                 logger.info("HIK: deny at %s (%s) – invalid transition from %s in %s mode (qr=%s)",
                          term.terminal_name, term.terminal_ip, current, mode or "both", qr)
-                return HttpResponse("OK", status=200)
+                return JsonResponse({
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "authResult": 1  # 0=pass, 1=fail
+                    }
+                })
 
-            # Update status and try to open door
+            # Update status
             appt.qr_code.status = next_status
             appt.qr_code.save(update_fields=["status"])
 
-            res = open_door(term, door_no=1)
-            if not res.get("ok"):
-                # Roll back status if you prefer (optional)
-                appt.qr_code.status = current
-                appt.qr_code.save(update_fields=["status"])
-                logger.warning("HIK: door open failed at %s (%s): %s",
-                            term.terminal_name, term.terminal_ip, res.get("error"))
-
-            logger.info("HIK: access %s at %s (%s) for %s -> %s",
-                        "GRANTED" if res.get("ok") else "DENIED",
+            logger.info("HIK: access GRANTED at %s (%s) for %s -> %s",
                         term.terminal_name, term.terminal_ip, qr, next_status)
 
-            # Always return XML so device doesn't show 'timeout'
-            if res.get("ok"):
-                return _hik_xml_response(True, "Access granted")
-            else:
-                return _hik_xml_response(False, f"Door open failed: {res.get('error', 'unknown')}")
+            # Send door open command to terminal
+            try:
+                result = open_door(term)
+                if result.get("ok"):
+                    logger.info("HIK: door open command sent to %s", term.terminal_ip)
+                else:
+                    logger.error("HIK: failed to open door at %s: %s", term.terminal_ip, result.get("error"))
+            except Exception as e:
+                logger.error("HIK: failed to open door at %s: %s", term.terminal_ip, e)
+
+            # Return JSON response for Sync mode terminal
+            return JsonResponse({
+                "code": 0,
+                "message": "success", 
+                "data": {
+                    "authResult": 0  # 0=pass, 1=fail
+                }
+            })
 
         # If we got here, nothing actionable; return OK to avoid device retries
         return HttpResponse("OK", status=200)

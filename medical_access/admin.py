@@ -2,8 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.views import redirect_to_login
 from django.urls import reverse
-from django.utils.html import format_html
-from .models import User, Doctor, Patient, Appointment, Terminal, Integration, QRCode
+from .models import User, Patient, Appointment, Terminal, Integration, QRCode
 from .services import probe_terminal, open_door
 
 # Custom Admin Site with Role-based Access
@@ -50,41 +49,17 @@ class CustomUserAdmin(UserAdmin):
         ('Medical Access Info', {'fields': ('role', 'phone')}),
     )
 
-# Doctor Admin
-class DoctorAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'procedure', 'price', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('first_name', 'last_name', 'procedure')
-    ordering = ('last_name', 'first_name')
-    readonly_fields = ('created_at', 'updated_at')
-    
-    fieldsets = (
-        ('Personal Information', {
-            'fields': ('first_name', 'last_name')
-        }),
-        ('Medical Information', {
-            'fields': ('procedure', 'price')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-
 # Patient Admin
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'passport_series', 'passport_number', 'phone', 'created_at')
+    list_display = ('first_name', 'last_name', 'medical_card_number', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('first_name', 'last_name', 'phone', 'passport_series', 'passport_number')
+    search_fields = ('first_name', 'last_name', 'medical_card_number')
     ordering = ('last_name', 'first_name')
     readonly_fields = ('created_at', 'updated_at')
     
     fieldsets = (
         ('Personal Information', {
-            'fields': ('first_name', 'last_name', 'phone')
-        }),
-        ('Passport Information', {
-            'fields': ('passport_series', 'passport_number')
+            'fields': ('first_name', 'last_name', 'medical_card_number')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -94,9 +69,9 @@ class PatientAdmin(admin.ModelAdmin):
 
 # Appointment Admin
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ('patient', 'doctor', 'created_at')
+    list_display = ('patient', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('patient__first_name', 'patient__last_name', 'patient__phone', 'doctor__first_name', 'doctor__last_name')
+    search_fields = ('patient__first_name', 'patient__last_name', 'patient__medical_card_number')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at')
     date_hierarchy = 'created_at'
@@ -104,7 +79,7 @@ class AppointmentAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Appointment Details', {
-            'fields': ('patient', 'doctor')
+            'fields': ('patient',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -163,19 +138,20 @@ class TerminalAdmin(admin.ModelAdmin):
 
 # Integration Admin
 class IntegrationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'api_url', 'is_active', 'token_preview', 'created_at')
+    list_display = ('name', 'is_active', 'token_preview', 'created_at')
     list_filter = ('is_active', 'created_at')
-    search_fields = ('name', 'api_url')
+    search_fields = ('name',)
     ordering = ('name',)
     readonly_fields = ('api_token', 'token_preview', 'created_at', 'updated_at')
     
     fieldsets = (
         ('Integration Information', {
-            'fields': ('name', 'api_url', 'is_active')
+            'fields': ('name', 'is_active'),
+            'description': 'Create integration for external partners. They will use the generated token to authenticate API requests.'
         }),
         ('API Token', {
             'fields': ('token_preview', 'api_token'),
-            'description': 'This token is automatically generated and used by external platforms to authenticate API requests. Keep it secure!'
+            'description': 'This token is automatically generated and used by partners to authenticate API requests. Share this token securely with your partners!'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -206,7 +182,6 @@ class QRCodeAdmin(admin.ModelAdmin):
 
 # Register all models with the custom admin site
 medical_admin_site.register(User, CustomUserAdmin)
-medical_admin_site.register(Doctor, DoctorAdmin)
 medical_admin_site.register(Patient, PatientAdmin)
 medical_admin_site.register(Appointment, AppointmentAdmin)
 medical_admin_site.register(Terminal, TerminalAdmin)
@@ -215,7 +190,6 @@ medical_admin_site.register(QRCode, QRCodeAdmin)
 
 # Also register with default admin site for super admin users
 admin.site.register(User, CustomUserAdmin)
-admin.site.register(Doctor, DoctorAdmin)
 admin.site.register(Patient, PatientAdmin)
 admin.site.register(Appointment, AppointmentAdmin)
 admin.site.register(Terminal, TerminalAdmin)

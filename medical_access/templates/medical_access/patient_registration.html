@@ -21,7 +21,7 @@
         
         <!-- Search and Export Controls -->
         <div class="patient-registration-controls-row">
-            <input type="text" id="searchQuery" name="searchQuery" placeholder="Search by name/phone" class="patient-registration-search-input">
+            <input type="text" id="searchQuery" name="searchQuery" placeholder="Search by name/medical card" class="patient-registration-search-input">
             <button type="button" class="patient-registration-btn patient-registration-btn--search" onclick="searchReceipts()">Search</button>
             <button type="button" class="patient-registration-btn patient-registration-btn--export" onclick="exportCSV()">CSV Export</button>
         </div>
@@ -33,9 +33,7 @@
                     <tr class="patient-registration-table-row">
                         <th class="patient-registration-table-header">ID</th>
                         <th class="patient-registration-table-header">Patient</th>
-                        <th class="patient-registration-table-header">Procedure</th>
-                        <th class="patient-registration-table-header">Doctor</th>
-                        <th class="patient-registration-table-header">Sum</th>
+                        <th class="patient-registration-table-header">Medical Card</th>
                         <th class="patient-registration-table-header">Status</th>
                         <th class="patient-registration-table-header">Actions</th>
                     </tr>
@@ -46,19 +44,10 @@
                         <td class="patient-registration-table-cell">{{ appointment.id }}</td>
                         <td class="patient-registration-table-cell">
                             <span class="patient-registration-patient-name">{{ appointment.patient.full_name }}</span>
-                            {% if appointment.patient.phone %}
-                            <span class="patient-registration-patient-phone">{{ appointment.patient.phone }}</span>
-                            {% endif %}
                         </td>
-                        <td class="patient-registration-table-cell">{{ appointment.doctor.procedure }}</td>
+                        <td class="patient-registration-table-cell">{{ appointment.patient.medical_card_number }}</td>
                         <td class="patient-registration-table-cell">
-                            {{ appointment.doctor.full_name }}
-                        </td>
-                        <td class="patient-registration-table-cell">
-                            <span class="patient-registration-amount">{{ appointment.doctor.price }} sum</span>
-                        </td>
-                        <td class="patient-registration-table-cell">
-                            <span class="status-badge status-badge--{{ appointment.status }}">{{ appointment.get_status_display }}</span>
+                            <span class="status-badge status-badge--{{ appointment.qr_code.status }}">{{ appointment.qr_code.get_status_display }}</span>
                         </td>
                         <td class="patient-registration-table-cell">
                             <div class="patient-registration-actions">
@@ -105,34 +94,8 @@
                 </div>
                 
                 <div class="modal-form-group">
-                    <label for="modal_phone" class="modal-form-label">Phone (Optional)</label>
-                    <input type="tel" id="modal_phone" name="phone" placeholder="+998 ..." class="modal-form-input">
-                </div>
-                
-                <div class="modal-form-group">
-                    <label for="modal_passport_series" class="modal-form-label">Passport Series</label>
-                    <input type="text" id="modal_passport_series" name="passport_series" placeholder="AA" class="modal-form-input">
-                </div>
-                
-                <div class="modal-form-group">
-                    <label for="modal_passport_number" class="modal-form-label">Passport Number</label>
-                    <input type="text" id="modal_passport_number" name="passport_number" placeholder="1234567" class="modal-form-input">
-                </div>
-                
-                <div class="modal-form-group">
-                    <label for="modal_doctor" class="modal-form-label">Doctor & Procedure</label>
-                    <select id="modal_doctor" name="doctor_id" class="modal-form-select" required>
-                        <option value="">— Select Doctor —</option>
-                        {% for doctor in doctors %}
-                        <option value="{{ doctor.id }}" data-price="{{ doctor.price }}">{{ doctor.full_name }} - {{ doctor.procedure }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="modal-form-group">
-                    <label for="modal_amount" class="modal-form-label">Amount (sum)</label>
-                    <input type="number" id="modal_amount" name="amount" value="0" step="0.01" class="modal-form-input" required>
-                    <small class="modal-form-hint">It will be substituted from the procedure, but it can be adjusted.</small>
+                    <label for="modal_medical_card_number" class="modal-form-label">Medical Card Number</label>
+                    <input type="text" id="modal_medical_card_number" name="medical_card_number" placeholder="MC1234567" class="modal-form-input" required>
                 </div>
             </form>
         </div>
@@ -150,29 +113,57 @@
 <script>
 // Modal Functions
 function openAddAppointmentModal() {
-    document.getElementById('addAppointmentModal').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    const modal = document.getElementById('addAppointmentModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
 }
 
 function closeAddAppointmentModal() {
-    document.getElementById('addAppointmentModal').style.display = 'none';
-    document.body.style.overflow = 'auto';
+    const modal = document.getElementById('addAppointmentModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
     // Reset form
-    document.getElementById('addAppointmentForm').reset();
+    const form = document.getElementById('addAppointmentForm');
+    if (form) {
+        form.reset();
+    }
 }
 
-// Update amount when modal doctor changes
-document.getElementById('modal_doctor').addEventListener('change', function() {
-    const option = this.options[this.selectedIndex];
-    const amountInput = document.getElementById('modal_amount');
-    
-    // Update amount and disable/enable input
-    if (option.dataset.price) {
-        amountInput.value = option.dataset.price;
-        amountInput.disabled = true;
-    } else {
-        amountInput.disabled = false;
+// Wait for DOM to be ready before adding event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Update amount when modal doctor changes (if doctor element exists)
+    const modalDoctor = document.getElementById('modal_doctor');
+    if (modalDoctor) {
+        modalDoctor.addEventListener('change', function() {
+            const option = this.options[this.selectedIndex];
+            const amountInput = document.getElementById('modal_amount');
+            
+            // Update amount and disable/enable input
+            if (amountInput && option.dataset.price) {
+                amountInput.value = option.dataset.price;
+                amountInput.disabled = true;
+            } else if (amountInput) {
+                amountInput.disabled = false;
+            }
+        });
     }
+    
+    // Hotkeys
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F9') {
+            e.preventDefault();
+            openAddAppointmentModal();
+        }
+        
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            openAddAppointmentModal();
+        }
+    });
 });
 
 
@@ -183,11 +174,7 @@ function submitAddAppointment() {
     const data = {
         first_name: formData.get('first_name'),
         last_name: formData.get('last_name'),
-        phone: formData.get('phone'),
-        passport_series: formData.get('passport_series'),
-        passport_number: formData.get('passport_number'),
-        doctor_id: formData.get('doctor_id'),
-        amount: formData.get('amount')
+        medical_card_number: formData.get('medical_card_number')
     };
     
     createAppointment(data, false);
@@ -199,11 +186,7 @@ function submitAddAppointmentAndOpen() {
     const data = {
         first_name: formData.get('first_name'),
         last_name: formData.get('last_name'),
-        phone: formData.get('phone'),
-        passport_series: formData.get('passport_series'),
-        passport_number: formData.get('passport_number'),
-        doctor_id: formData.get('doctor_id'),
-        amount: formData.get('amount')
+        medical_card_number: formData.get('medical_card_number')
     };
     
     createAppointment(data, true);
@@ -248,7 +231,10 @@ function openReceipt(appointmentId) {
 
 // Enhanced search functionality
 function searchReceipts() {
-    const query = document.getElementById('searchQuery').value.toLowerCase();
+    const searchQuery = document.getElementById('searchQuery');
+    if (!searchQuery) return;
+    
+    const query = searchQuery.value.toLowerCase();
     
     const rows = document.querySelectorAll('.patient-registration-table tbody tr');
     
@@ -322,17 +308,5 @@ function exportCSV() {
 // Utility Functions - Use the global showMessage from main.js
 // The showMessage function is already defined in main.js and uses the modern toast system
 
-// Hotkeys
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'F9') {
-        e.preventDefault();
-        openAddAppointmentModal();
-    }
-    
-    if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault();
-        openAddAppointmentModal();
-    }
-});
 </script>
 {% endblock %}

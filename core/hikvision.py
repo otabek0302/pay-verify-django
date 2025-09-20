@@ -35,7 +35,8 @@ class HikTerminal:
         xml = f"<RemoteControlDoor><cmd>{cmd}</cmd></RemoteControlDoor>"
         r = requests.put(
             f"{self.base}/ISAPI/AccessControl/RemoteControl/door/{door_no}",
-            data=xml, headers=self.h_xml, auth=self.auth, timeout=self.timeout
+            data=xml, headers=self.h_xml, auth=self.auth, timeout=self.timeout,
+            verify=False  # Disable SSL verification for self-signed certificates
         )
         r.raise_for_status()
         return r.text

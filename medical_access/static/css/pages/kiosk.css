@@ -10,7 +10,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     z-index: 9999;
 }
 
@@ -125,6 +126,10 @@
     animation: spin 1s linear infinite;
 }
 
+.kiosk-status.ready i {
+    color: #10b981;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -141,10 +146,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     padding: 20px;
     position: relative;
     z-index: 2;
+    min-height: calc(100vh - 200px);
 }
 
 /* Scan Area */
@@ -479,11 +485,13 @@
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 24px;
     padding: 40px;
-    margin-bottom: 30px;
+    margin: 30px auto;
     max-width: 500px;
     width: 100%;
     text-align: center;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
 }
 
 .kiosk-result.granted {
@@ -494,6 +502,16 @@
 .kiosk-result.denied {
     border-color: #ef4444;
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result.success {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result.info {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
 }
 
 .kiosk-result-icon {
@@ -507,6 +525,14 @@
 
 .kiosk-result.denied .kiosk-result-icon {
     color: #ef4444;
+}
+
+.kiosk-result.success .kiosk-result-icon {
+    color: #10b981;
+}
+
+.kiosk-result.info .kiosk-result-icon {
+    color: #3b82f6;
 }
 
 .kiosk-result-text {
@@ -570,6 +596,24 @@
 .kiosk-result-actions {
     display: flex;
     justify-content: center;
+    margin-top: 20px;
+}
+
+/* Ensure result section is scrollable and visible */
+.kiosk-result.show {
+    display: block;
+    animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .kiosk-action-button {
@@ -709,6 +753,13 @@
 
     .kiosk-result {
         padding: 30px 20px;
+        margin: 20px auto;
+        max-width: 90%;
+    }
+    
+    .kiosk-container {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .kiosk-result-text {

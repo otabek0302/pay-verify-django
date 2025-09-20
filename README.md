@@ -27,7 +27,7 @@ payverify_django/
 │   └── apps.py          # App configuration
 ├── static/               # Static files directory
 ├── manage.py            # Django management script
-├── Pipfile              # Python dependencies
+├── requirements.txt     # Python dependencies
 └── README.md            # This file
 ```
 
@@ -39,9 +39,9 @@ payverify_django/
    cd payverify_django
    ```
 
-2. **Run the setup script:**
+2. **Run the deployment script:**
    ```bash
-   ./setup.sh
+   ./deploy.sh
    ```
 
 3. **Access the application:**
@@ -52,12 +52,14 @@ payverify_django/
 
 1. **Install dependencies:**
    ```bash
-   pipenv install
+   pip install -r requirements.txt
    ```
 
-2. **Activate virtual environment:**
+2. **Create virtual environment (optional but recommended):**
    ```bash
-   pipenv shell
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
    ```
 
 3. **Run database migrations:**

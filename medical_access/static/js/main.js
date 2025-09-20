@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Sidebar navigation highlighting
     const currentPath = window.location.pathname;
-    const navLinks = document.querySelectorAll('.sidebar-nav .nav-link');
+    const navLinks = document.querySelectorAll('.sidebar-nav-link');
     
     navLinks.forEach(link => {
         if (link.getAttribute('href') === currentPath) {
