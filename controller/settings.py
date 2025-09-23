@@ -82,6 +82,11 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = False
 
+# Allow Chrome Extension origin via regex (django-cors-headers)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh$",
+]
+
 # Additional CORS settings for API endpoints
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 CORS_ALLOW_HEADERS = [
