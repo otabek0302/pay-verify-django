@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qabul №{{ appointment.id }}</title>
+    <style>
+        @media print {
+            body { 
+                margin: 0; 
+                padding: 0;
+                background: white;
+            }
+            .no-print { display: none !important; }
+            .receipt { 
+                box-shadow: none; 
+                border: none;
+                margin: 0;
+                padding: 10px;
+            }
+            .receipt-container {
+                max-width: none;
+                margin: 0;
+            }
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            font-size: 12px;
+        }
+        
+        .receipt-container {
+            max-width: 300px;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .receipt {
+            width: 100%;
+        }
+        
+        /* Header Section - Removed */
+        
+        /* QR Code Section */
+        .qr-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+        }
+        
+        .qr-code {
+            max-width: 150px;
+            height: auto;
+            margin: 10px 0;
+        }
+        
+        .qr-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Patient Information */
+        .patient-info {
+            margin: 20px 0;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .info-value {
+            color: #666;
+            text-align: right;
+        }
+        
+        .patient-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .card-number {
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
+        /* Appointment Details */
+        .appointment-details {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        
+        .appointment-id {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+        
+        .appointment-time {
+            text-align: center;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* Footer - Removed */
+        
+        /* Action Buttons */
+        .action-buttons {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .action-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 8px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+        
+        .action-btn.secondary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        }
+        
+        .action-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <div class="receipt">
+            <!-- Header - Removed -->
+            
+            <!-- QR Code Section -->
+            <div class="qr-section">
+                <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code" class="qr-code">
+                <div class="qr-label">QR kodni skanerlang</div>
+            </div>
+            
+            <!-- Patient Information -->
+            <div class="patient-info">
+                <div class="info-row">
+                    <span class="info-label">Sana:</span>
+                    <span class="info-value">{{ appointment.created_at|date:"d.m.Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bemor:</span>
+                    <span class="info-value patient-name">{{ appointment.patient.full_name|upper }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Tibbiy karta raqami:</span>
+                    <span class="info-value card-number">{{ appointment.patient.medical_card_number }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Hisob-faktura:</span>
+                    <span class="info-value">#{{ appointment.id|stringformat:"07d" }}</span>
+                </div>
+            </div>
+            
+            <!-- Appointment Details -->
+            <div class="appointment-details">
+                <div class="appointment-id">#{{ appointment.id|stringformat:"07d" }}</div>
+                <div class="appointment-time">{{ appointment.created_at|time:"H:i" }}</div>
+            </div>
+            
+            <!-- Footer - Removed -->
+            
+            <!-- Action Buttons (Hidden in Print) -->
+            <div class="action-buttons no-print">
+                <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="action-btn primary">Full Details</a>
+                <button onclick="window.print()" class="action-btn secondary">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

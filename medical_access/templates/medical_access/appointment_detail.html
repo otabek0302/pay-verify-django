@@ -1,0 +1,169 @@
+{% extends 'medical_access/base.html' %}
+{% load static %}
+
+{% block title %}Appointment Details - Medical Access System{% endblock %}
+
+{% block content %}
+<div class="appointment-detail-container">
+    <!-- Header Section -->
+    <div class="appointment-detail-header">
+        <div class="appointment-detail-title-section">
+            <h1 class="appointment-detail-title">
+                <i class="fas fa-calendar-check"></i>
+                Appointment Details
+            </h1>
+            <p class="appointment-detail-subtitle">Complete appointment information and access management</p>
+        </div>
+        <a href="{% url 'medical_access:dashboard' %}" class="appointment-detail-back-btn">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="appointment-detail-content">
+        <!-- Appointment Information Card -->
+        <div class="appointment-detail-card">
+            <div class="appointment-detail-card-header">
+                <h2 class="appointment-detail-card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Appointment Information
+                </h2>
+            </div>
+            
+            <div class="appointment-detail-info-grid">
+                <div class="appointment-detail-info-item">
+                    <div class="appointment-detail-info-icon">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="appointment-detail-info-content">
+                        <label class="appointment-detail-info-label">Patient</label>
+                        <span class="appointment-detail-info-value">{{ appointment.patient.full_name }}</span>
+                    </div>
+                </div>
+                
+                <div class="appointment-detail-info-item">
+                    <div class="appointment-detail-info-icon">
+                        <i class="fas fa-id-card"></i>
+                    </div>
+                    <div class="appointment-detail-info-content">
+                        <label class="appointment-detail-info-label">Medical Card</label>
+                        <span class="appointment-detail-info-value">{{ appointment.patient.medical_card_number }}</span>
+                    </div>
+                </div>
+                
+                <div class="appointment-detail-info-item">
+                    <div class="appointment-detail-info-icon">
+                        <i class="fas fa-calendar"></i>
+                    </div>
+                    <div class="appointment-detail-info-content">
+                        <label class="appointment-detail-info-label">Created</label>
+                        <span class="appointment-detail-info-value">{{ appointment.created_at|date:"F d, Y" }}</span>
+                        <small class="appointment-detail-info-meta">{{ appointment.created_at|time:"g:i A" }}</small>
+                    </div>
+                </div>
+                
+                
+            </div>
+        </div>
+        
+        <!-- QR Code Section -->
+        <div class="appointment-detail-card">
+            <div class="appointment-detail-card-header">
+                <h2 class="appointment-detail-card-title">
+                    <i class="fas fa-qrcode"></i>
+                    QR Code Access
+                </h2>
+            </div>
+            
+            {% if appointment.qr_code %}
+                <!-- QR Code Status Display -->
+                <div class="appointment-detail-qr-status">
+                    <div class="appointment-detail-qr-status-header">
+                        <h3 class="appointment-detail-qr-status-title">Current QR Code Status</h3>
+                        <span class="qr-status-badge qr-status-badge--{{ appointment.qr_code.status }}">
+                            {% if appointment.qr_code.status == 'active' %}
+                                <i class="fas fa-check-circle"></i> Active
+                            {% elif appointment.qr_code.status == 'entered' %}
+                                <i class="fas fa-door-open"></i> Entered
+                            {% elif appointment.qr_code.status == 'left' %}
+                                <i class="fas fa-door-closed"></i> Left
+                            {% elif appointment.qr_code.status == 'expired' %}
+                                <i class="fas fa-clock"></i> Expired
+                            {% else %}
+                                <i class="fas fa-question-circle"></i> {{ appointment.qr_code.get_status_display }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="appointment-detail-qr-info-grid">
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">QR Code</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.code }}</span>
+                        </div>
+                        
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">Generated</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.created_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                        
+                        <div class="appointment-detail-qr-info-item">
+                            <label class="appointment-detail-qr-info-label">Expires</label>
+                            <span class="appointment-detail-qr-info-value">{{ appointment.qr_code.expires_at|date:"M d, Y g:i A" }}</span>
+                        </div>
+                        
+                    </div>
+                    
+                    <div class="appointment-detail-qr-actions">
+                        <a href="{% url 'medical_access:generate_receipt' appointment.id %}" class="appointment-detail-btn appointment-detail-btn--success">
+                            <i class="fas fa-print"></i>
+                            Print Receipt
+                        </a>
+                        <form method="post" action="{% url 'medical_access:create_qr' appointment.id %}" class="appointment-detail-qr-form">
+                            {% csrf_token %}
+                            <button type="submit" class="appointment-detail-btn appointment-detail-btn--primary">
+                                <i class="fas fa-refresh"></i>
+                                Regenerate QR Code
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="appointment-detail-qr-section">
+                    <div class="appointment-detail-qr-info">
+                        <p class="appointment-detail-qr-description">
+                            Generate a QR code to access the medical facility. The QR code will be valid for 24 hours from generation.
+                        </p>
+                    </div>
+                    
+                    <div class="appointment-detail-qr-actions">
+                        <form method="post" action="{% url 'medical_access:create_qr' appointment.id %}" class="appointment-detail-qr-form">
+                            {% csrf_token %}
+                            <button type="submit" class="appointment-detail-btn appointment-detail-btn--primary">
+                                <i class="fas fa-qrcode"></i>
+                                Generate QR Code
+                            </button>
+                        </form>
+                        <a href="{% url 'medical_access:generate_receipt' appointment.id %}" class="appointment-detail-btn appointment-detail-btn--success">
+                            <i class="fas fa-print"></i>
+                            Print Receipt
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="appointment-detail-actions">
+            <a href="{% url 'medical_access:appointments' %}" class="appointment-detail-action-btn">
+                <i class="fas fa-list"></i>
+                View All Appointments
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<!-- Appointment Detail Page CSS is loaded via main.css -->
+{% endblock %}

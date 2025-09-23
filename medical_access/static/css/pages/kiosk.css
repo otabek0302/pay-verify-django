@@ -1,0 +1,805 @@
+/* === Modern Kiosk/QR Scanner Styles === */
+.kiosk-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    width: 100vw;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 9999;
+}
+
+.kiosk-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+/* Header Section */
+.kiosk-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.kiosk-back-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 3;
+}
+
+.kiosk-back-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    color: white;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.kiosk-back-link:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    color: white;
+    text-decoration: none;
+}
+
+.kiosk-back-link i {
+    font-size: 16px;
+}
+
+.kiosk-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 48px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.kiosk-logo i {
+    font-size: 52px;
+    color: #ffd700;
+}
+
+.kiosk-subtitle {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+.kiosk-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.kiosk-status i {
+    font-size: 12px;
+    animation: pulse 2s infinite;
+}
+
+.kiosk-status.success i {
+    color: #4ade80;
+}
+
+.kiosk-status.error i {
+    color: #f87171;
+}
+
+.kiosk-status.scanning i {
+    color: #60a5fa;
+    animation: spin 1s linear infinite;
+}
+
+.kiosk-status.ready i {
+    color: #10b981;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Main Content */
+.kiosk-main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px;
+    position: relative;
+    z-index: 2;
+    min-height: calc(100vh - 200px);
+}
+
+/* Scan Area */
+.kiosk-scan-area {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 60px 40px;
+    margin-bottom: 30px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.kiosk-scan-area:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+.kiosk-scan-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    color: #667eea;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.kiosk-scan-text {
+    font-size: 24px;
+    color: #1f2937;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.kiosk-scan-subtitle {
+    font-size: 16px;
+    color: #6b7280;
+    margin-bottom: 32px;
+    font-weight: 400;
+}
+
+.kiosk-scan-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    padding: 16px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 auto;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.kiosk-scan-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+}
+
+.kiosk-scan-button:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Manual Input Section */
+.kiosk-manual-input {
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.kiosk-divider {
+    position: relative;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.kiosk-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.kiosk-divider span {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0 16px;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.kiosk-manual-section {
+    text-align: left;
+}
+
+.kiosk-manual-text {
+    font-size: 16px;
+    color: #374151;
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+.kiosk-input-group {
+    display: flex;
+    gap: 12px;
+}
+
+.kiosk-manual-input-field {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 14px;
+    color: #1f2937;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+.kiosk-manual-input-field:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    outline: none;
+}
+
+.kiosk-manual-input-field::placeholder {
+    color: #9ca3af;
+}
+
+.kiosk-verify-button {
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kiosk-verify-button:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+/* Camera Area */
+.kiosk-camera-area {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 30px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.kiosk-camera-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.kiosk-camera-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.kiosk-camera-title i {
+    color: #667eea;
+}
+
+.kiosk-close-button {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.kiosk-close-button:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+.kiosk-camera-container {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+#video {
+    width: 100%;
+    max-width: 400px;
+    display: block;
+    background: #000;
+}
+
+.kiosk-scan-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kiosk-scan-frame {
+    width: 200px;
+    height: 200px;
+    border: 3px solid #667eea;
+    border-radius: 16px;
+    position: relative;
+    animation: scanPulse 2s ease-in-out infinite;
+}
+
+.kiosk-scan-frame::before,
+.kiosk-scan-frame::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #667eea;
+}
+
+.kiosk-scan-frame::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.kiosk-scan-frame::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+}
+
+@keyframes scanPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.kiosk-camera-instruction {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 16px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.kiosk-camera-instruction i {
+    color: #667eea;
+}
+
+/* Loading State */
+.kiosk-loading {
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 40px;
+    margin-bottom: 30px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.kiosk-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e5e7eb;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+.kiosk-loading-text {
+    font-size: 16px;
+    color: #374151;
+    font-weight: 500;
+}
+
+/* Result Display */
+.kiosk-result {
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 40px;
+    margin: 30px auto;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
+}
+
+.kiosk-result.granted {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result.denied {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result.success {
+    border-color: #10b981;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result.info {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-result-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+}
+
+.kiosk-result.granted .kiosk-result-icon {
+    color: #10b981;
+}
+
+.kiosk-result.denied .kiosk-result-icon {
+    color: #ef4444;
+}
+
+.kiosk-result.success .kiosk-result-icon {
+    color: #10b981;
+}
+
+.kiosk-result.info .kiosk-result-icon {
+    color: #3b82f6;
+}
+
+.kiosk-result-text {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #1f2937;
+}
+
+.kiosk-result-subtitle {
+    font-size: 18px;
+    color: #6b7280;
+    margin-bottom: 24px;
+    font-weight: 500;
+}
+
+.kiosk-patient-info {
+    margin-bottom: 32px;
+}
+
+.kiosk-patient-details {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.kiosk-patient-name,
+.kiosk-patient-procedure {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 12px;
+    font-size: 16px;
+    color: #374151;
+}
+
+.kiosk-patient-name i,
+.kiosk-patient-procedure i {
+    color: #667eea;
+    font-size: 18px;
+}
+
+.kiosk-error-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 12px;
+    font-size: 16px;
+    color: #374151;
+}
+
+.kiosk-error-message i {
+    color: #ef4444;
+    font-size: 18px;
+}
+
+.kiosk-result-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* Ensure result section is scrollable and visible */
+.kiosk-result.show {
+    display: block;
+    animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kiosk-action-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    padding: 16px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.kiosk-action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Footer */
+.kiosk-footer {
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+
+.kiosk-footer-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.kiosk-footer-text i {
+    color: #ffd700;
+}
+
+/* Toast Notifications */
+.kiosk-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    max-width: 400px;
+    width: 90%;
+}
+
+.kiosk-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.kiosk-toast.error {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.kiosk-toast i {
+    font-size: 16px;
+}
+
+.kiosk-toast.error i {
+    color: #ef4444;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .kiosk-container {
+        padding: 0;
+    }
+
+    .kiosk-header {
+        padding: 20px 16px 16px;
+    }
+
+    .kiosk-logo {
+        font-size: 36px;
+    }
+
+    .kiosk-logo i {
+        font-size: 40px;
+    }
+
+    .kiosk-subtitle {
+        font-size: 16px;
+    }
+
+    .kiosk-main-content {
+        padding: 16px;
+    }
+
+    .kiosk-scan-area {
+        padding: 40px 20px;
+    }
+
+    .kiosk-scan-icon {
+        font-size: 60px;
+    }
+
+    .kiosk-scan-text {
+        font-size: 20px;
+    }
+
+    .kiosk-scan-subtitle {
+        font-size: 14px;
+    }
+
+    .kiosk-scan-button {
+        padding: 14px 28px;
+        font-size: 14px;
+    }
+
+    .kiosk-input-group {
+        flex-direction: column;
+    }
+
+    .kiosk-result {
+        padding: 30px 20px;
+        margin: 20px auto;
+        max-width: 90%;
+    }
+    
+    .kiosk-container {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .kiosk-result-text {
+        font-size: 28px;
+    }
+
+    .kiosk-result-icon {
+        font-size: 60px;
+    }
+
+    .kiosk-patient-name,
+    .kiosk-patient-procedure,
+    .kiosk-error-message {
+        font-size: 14px;
+    }
+
+    .kiosk-back-button {
+        top: 16px;
+        left: 16px;
+    }
+
+    .kiosk-back-link {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    .kiosk-back-link span {
+        display: none;
+    }
+
+    .kiosk-toast {
+        bottom: 16px;
+        left: 16px;
+        right: 16px;
+        transform: translateY(100%);
+        max-width: none;
+        width: auto;
+    }
+
+    .kiosk-toast.show {
+        transform: translateY(0);
+    }
+}

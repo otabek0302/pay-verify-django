@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% block title %}PayVerify - Medical Access Management{% endblock %}</title>
+        {% load static %}
+
+        <!-- Font Awesome -->
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="{% static 'css/fontawesome/all.min.css' %}" />
+
+        <!-- Inter Font -->
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet" />
+
+        <!-- Main CSS -->
+        <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+        {% block extra_css %}{% endblock %}
+    </head>
+    <body>
+        <main class="container">
+            {% if user.is_authenticated %}
+            <div class="main-container">
+                <!-- Sidebar Template -->
+                <aside class="sidebar-content">
+                    <div class="sidebar-header">
+                        <h3 class="sidebar-header-title">Navigation</h3>
+                    </div>
+
+                    <nav class="sidebar-nav">
+                        <ul class="sidebar-nav-list">
+                            <li class="sidebar-nav-item">
+                                <a href="{% url 'medical_access:dashboard' %}" class="sidebar-nav-link"><i class="fas fa-th-large"></i> Dashboard</a>
+                            </li>
+                            <li class="sidebar-nav-item">
+                                <a href="{% url 'medical_access:kiosk' %}" class="sidebar-nav-link" target="_blank"><i class="fas fa-qrcode"></i> QR Scanner</a>
+                            </li>
+                            <li class="sidebar-nav-divider"></li>
+                            <li class="sidebar-nav-item">
+                                <a href="{% url 'medical_access:patient_registration' %}" class="sidebar-nav-link"><i class="fas fa-user-plus"></i> Patient Registration</a>
+                            </li>
+                            <li class="sidebar-nav-item">
+                                <a href="{% url 'medical_access:appointments' %}" class="sidebar-nav-link"><i class="fas fa-calendar-alt"></i> Appointments</a>
+                            </li>
+                            <li class="sidebar-nav-item">
+                                <a href="{% url 'medical_access:terminals' %}" class="sidebar-nav-link"><i class="fas fa-desktop"></i> Terminals</a>
+                            </li>
+                        </ul>
+                    </nav>
+
+                    <div class="sidebar-footer">
+                        <ul class="sidebar-nav-list">
+                            <li class="sidebar-footer-item">
+                                <a href="{% url 'medical_access:logout' %}" class="sidebar-nav-link"><i class="fas fa-sign-out-alt"></i> Log out</a>
+                            </li>
+                        </ul>
+                    </div>
+                </aside>
+                <!-- Main content area -->
+                <div class="main-content">{% block content %}{% endblock %}</div>
+            </div>
+            {% else %}
+
+            <!-- Login/Register forms for non-authenticated users -->
+            <div class="login-page-content">{% block auth_content %}{% endblock %}</div>
+            {% endif %}
+        </main>
+
+
+        <script src="{% static 'js/main.js' %}?v={{ timestamp|default:'3' }}"></script>
+        {% block extra_js %}{% endblock %}
+    </body>
+</html>

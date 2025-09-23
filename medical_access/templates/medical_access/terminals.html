@@ -1,0 +1,170 @@
+{% extends 'medical_access/base.html' %}
+{% load static %}
+
+{% block title %}Terminals - PayVerify{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/terminals_page.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="terminals-page">
+    <div class="terminals-page-header">
+        <h1 class="terminals-page-title">Terminals</h1>
+        <div class="terminals-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="terminals-page-btn terminals-page-btn--secondary">Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <div class="terminals-table-section">
+        <table class="terminals-table">
+            <thead class="terminals-table-head">
+                <tr class="terminals-table-row">
+                    <th class="terminals-table-header">ID</th>
+                    <th class="terminals-table-header">Name</th>
+                    <th class="terminals-table-header">IP Address</th>
+                    <th class="terminals-table-header">MAC Address</th>
+                    <th class="terminals-table-header">Mode</th>
+                    <th class="terminals-table-header">Status</th>
+                    <th class="terminals-table-header">Last Seen</th>
+                    <th class="terminals-table-header">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="terminals-table-body">
+                {% for terminal in terminals %}
+                <tr class="terminals-table-row" data-terminal-id="{{ terminal.id }}">
+                    <td class="terminals-table-cell">{{ terminal.id }}</td>
+                    <td class="terminals-table-cell terminals-table-cell--name">{{ terminal.terminal_name }}</td>
+                    <td class="terminals-table-cell terminals-table-cell--ip">{{ terminal.terminal_ip }}</td>
+                    <td class="terminals-table-cell terminals-table-cell--mac">{{ terminal.mac_address|default:"Not Set" }}</td>
+                    <td class="terminals-table-cell terminals-table-cell--mode">
+                        <span class="terminal-mode-badge terminal-mode-badge--{{ terminal.mode|lower }}">
+                            {{ terminal.mode|upper }}
+                        </span>
+                    </td>
+                    <td class="terminals-table-cell terminals-table-cell--status">
+                        {% if terminal.reachable %}
+                            <span class="status-badge status-badge--online">Online</span>
+                        {% else %}
+                            <span class="status-badge status-badge--offline">Offline</span>
+                        {% endif %}
+                    </td>
+                    <td class="terminals-table-cell">
+                        {% if terminal.last_seen %}
+                            {{ terminal.last_seen|date:"d/m/Y H:i" }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </td>
+                    <td class="terminals-table-cell">
+                        {% if user.role == 'admin' or user.role == 'super_admin' %}
+                        <div class="terminals-actions">
+                            <button class="terminals-action-btn terminals-action-btn--open" 
+                                    onclick="openTerminalDoor({{ terminal.id }}, '{{ terminal.terminal_name|escapejs }}')">
+                                Open Door
+                            </button>
+                        </div>
+                        {% else %}
+                        <span class="terminals-no-actions">No actions available</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="terminals-table-row">
+                    <td colspan="7" class="terminals-table-cell terminals-table-cell--empty">No terminals found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} terminals
+        </div>
+        <div class="pagination">
+            <div class="pagination-numbers">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-link pagination-link--current">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
+                    {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                        <span class="pagination-ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="pagination-nav">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openTerminalDoor(terminalId, terminalName) {
+    if (confirm(`Are you sure you want to open the door on ${terminalName}?`)) {
+        // Show loading state
+        const button = event.target;
+        const originalText = button.textContent;
+        button.textContent = 'Opening...';
+        button.disabled = true;
+        
+        // Make API call to open door
+        fetch(`/medical_access/terminals/${terminalId}/open/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('Door opened successfully on ' + terminalName, 'success');
+            } else {
+                showMessage('Failed to open door: ' + (data.message || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('Failed to open door: Network error', 'error');
+        })
+        .finally(() => {
+            // Reset button state
+            button.textContent = originalText;
+            button.disabled = false;
+        });
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Utility Functions - Use the global showMessage from main.js
+// The showMessage function is already defined in main.js and uses the modern toast system
+</script>
+{% endblock %}

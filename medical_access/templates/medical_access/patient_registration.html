@@ -1,0 +1,312 @@
+{% extends 'medical_access/base.html' %}
+
+{% block title %}Patient Registration - PayVerify{% endblock %}
+
+{% block content %}
+<div class="patient-registration-page">
+    <!-- Page Header -->
+    <div class="patient-registration-page-header">
+        <h1 class="patient-registration-page-title">Patient Registration</h1>
+        <div class="patient-registration-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="patient-registration-page-btn patient-registration-page-btn--secondary">Back to Dashboard</a>
+            <button class="patient-registration-page-btn patient-registration-page-btn--primary" onclick="openAddAppointmentModal()">Add New Appointment</button>
+        </div>
+    </div>
+    
+    <!-- Latest Receipts Section -->
+    <div class="patient-registration-receipts-section">
+        <div class="patient-registration-receipts-header">
+            <h3 class="patient-registration-receipts-title">Latest Receipts</h3>
+        </div>
+        
+        <!-- Search and Export Controls -->
+        <div class="patient-registration-controls-row">
+            <input type="text" id="searchQuery" name="searchQuery" placeholder="Search by name/medical card" class="patient-registration-search-input">
+            <button type="button" class="patient-registration-btn patient-registration-btn--search" onclick="searchReceipts()">Search</button>
+            <button type="button" class="patient-registration-btn patient-registration-btn--export" onclick="exportCSV()">CSV Export</button>
+        </div>
+        
+        <!-- Receipts Table -->
+        <div class="patient-registration-receipts-table">
+            <table class="patient-registration-table">
+                <thead class="patient-registration-table-head">
+                    <tr class="patient-registration-table-row">
+                        <th class="patient-registration-table-header">ID</th>
+                        <th class="patient-registration-table-header">Patient</th>
+                        <th class="patient-registration-table-header">Medical Card</th>
+                        <th class="patient-registration-table-header">Status</th>
+                        <th class="patient-registration-table-header">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="patient-registration-table-body">
+                    {% for appointment in latest_appointments %}
+                    <tr class="patient-registration-table-row">
+                        <td class="patient-registration-table-cell">{{ appointment.id }}</td>
+                        <td class="patient-registration-table-cell">
+                            <span class="patient-registration-patient-name">{{ appointment.patient.full_name }}</span>
+                        </td>
+                        <td class="patient-registration-table-cell">{{ appointment.patient.medical_card_number }}</td>
+                        <td class="patient-registration-table-cell">
+                            <span class="status-badge status-badge--{{ appointment.qr_code.status }}">{{ appointment.qr_code.get_status_display }}</span>
+                        </td>
+                        <td class="patient-registration-table-cell">
+                            <div class="patient-registration-actions">
+                                <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
+                                   class="patient-registration-action-btn patient-registration-action-btn--open" target="_blank">Open</a>
+                                <a href="{% url 'medical_access:generate_receipt' appointment.id %}" 
+                                   class="patient-registration-action-btn patient-registration-action-btn--print" target="_blank">Print</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="patient-registration-table-row">
+                        <td colspan="7" class="patient-registration-table-cell patient-registration-table-cell--empty">
+                            No appointments found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Appointment Modal -->
+<div id="addAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Add New Appointment</h2>
+            <button class="modal-close" onclick="closeAddAppointmentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addAppointmentForm" class="modal-form">
+                {% csrf_token %}
+                <div class="modal-form-row">
+                    <div class="modal-form-group">
+                        <label for="modal_first_name" class="modal-form-label">Patient's First Name</label>
+                        <input type="text" id="modal_first_name" name="first_name" class="modal-form-input" required>
+                    </div>
+                    
+                    <div class="modal-form-group">
+                        <label for="modal_last_name" class="modal-form-label">Patient's Last Name</label>
+                        <input type="text" id="modal_last_name" name="last_name" class="modal-form-input" required>
+                    </div>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="modal_medical_card_number" class="modal-form-label">Medical Card Number</label>
+                    <input type="text" id="modal_medical_card_number" name="medical_card_number" placeholder="MC1234567" class="modal-form-input" required>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn--secondary" onclick="closeAddAppointmentModal()">Cancel</button>
+            <button type="button" class="modal-btn modal-btn--primary" onclick="submitAddAppointment()">Create Appointment</button>
+            <button type="button" class="modal-btn modal-btn--success" onclick="submitAddAppointmentAndOpen()">Create and Open</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Modal Functions
+function openAddAppointmentModal() {
+    const modal = document.getElementById('addAppointmentModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeAddAppointmentModal() {
+    const modal = document.getElementById('addAppointmentModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    // Reset form
+    const form = document.getElementById('addAppointmentForm');
+    if (form) {
+        form.reset();
+    }
+}
+
+// Wait for DOM to be ready before adding event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Update amount when modal doctor changes (if doctor element exists)
+    const modalDoctor = document.getElementById('modal_doctor');
+    if (modalDoctor) {
+        modalDoctor.addEventListener('change', function() {
+            const option = this.options[this.selectedIndex];
+            const amountInput = document.getElementById('modal_amount');
+            
+            // Update amount and disable/enable input
+            if (amountInput && option.dataset.price) {
+                amountInput.value = option.dataset.price;
+                amountInput.disabled = true;
+            } else if (amountInput) {
+                amountInput.disabled = false;
+            }
+        });
+    }
+    
+    // Hotkeys
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F9') {
+            e.preventDefault();
+            openAddAppointmentModal();
+        }
+        
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            openAddAppointmentModal();
+        }
+    });
+});
+
+
+// Modal form submission functions
+function submitAddAppointment() {
+    const form = document.getElementById('addAppointmentForm');
+    const formData = new FormData(form);
+    const data = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        medical_card_number: formData.get('medical_card_number')
+    };
+    
+    createAppointment(data, false);
+}
+
+function submitAddAppointmentAndOpen() {
+    const form = document.getElementById('addAppointmentForm');
+    const formData = new FormData(form);
+    const data = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        medical_card_number: formData.get('medical_card_number')
+    };
+    
+    createAppointment(data, true);
+}
+
+// Generic appointment creation function
+function createAppointment(data, openAfterCreate = false) {
+    fetch('{% url "medical_access:create_appointment" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeAddAppointmentModal();
+            // Reload page to show new appointment
+            setTimeout(() => {
+                location.reload();
+                if (openAfterCreate && data.appointment_id) {
+                    // Open the created appointment in a new tab
+                    window.open(`{% url 'medical_access:appointment_detail' 0 %}`.replace('0', data.appointment_id), '_blank');
+                }
+            }, 1500);
+        } else {
+            showMessage(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error creating appointment', 'error');
+    });
+}
+
+// Open receipt
+function openReceipt(appointmentId) {
+    window.open(`{% url 'medical_access:appointment_detail' 0 %}`.replace('0', appointmentId), '_blank');
+}
+
+// Enhanced search functionality
+function searchReceipts() {
+    const searchQuery = document.getElementById('searchQuery');
+    if (!searchQuery) return;
+    
+    const query = searchQuery.value.toLowerCase();
+    
+    const rows = document.querySelectorAll('.patient-registration-table tbody tr');
+    
+    rows.forEach(row => {
+        const patientName = row.querySelector('.patient-registration-patient-name')?.textContent.toLowerCase() || '';
+        const patientPhone = row.querySelector('.patient-registration-patient-phone')?.textContent.toLowerCase() || '';
+        const procedureName = row.querySelector('td:nth-child(3)')?.textContent.toLowerCase() || '';
+        const doctorName = row.querySelector('td:nth-child(4)')?.textContent.toLowerCase() || '';
+        
+        const matchesSearch = !query || 
+            patientName.includes(query) || 
+            patientPhone.includes(query) || 
+            procedureName.includes(query) || 
+            doctorName.includes(query);
+        
+        row.style.display = matchesSearch ? '' : 'none';
+    });
+    
+    // Show success message
+    if (query) {
+        showMessage(`Search results for: "${query}"`, 'success');
+    }
+}
+
+// Enhanced Excel export for today's appointments only
+function exportCSV() {
+    const table = document.querySelector('.patient-registration-table');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const today = new Date().toISOString().split('T')[0];
+    
+    let csv = [];
+    
+    // Add headers
+    const headers = Array.from(rows[0].querySelectorAll('th')).map(th => th.textContent);
+    csv.push(headers.join('\t')); // Use tab separator for Excel
+    
+    // Add data rows - only today's appointments
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.style.display !== 'none') { // Only include visible rows
+            const cells = Array.from(row.querySelectorAll('td'));
+            const rowData = cells.map(cell => {
+                // Clean up the cell content (remove HTML, get just text)
+                let text = cell.textContent.trim();
+                // Escape tabs and quotes for Excel
+                if (text.includes('\t') || text.includes('"')) {
+                    text = `"${text.replace(/"/g, '""')}"`;
+                }
+                return text;
+            });
+            csv.push(rowData.join('\t'));
+        }
+    }
+    
+    // Create and download Excel file
+    const excelContent = csv.join('\n');
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `today_appointments_${today}.xls`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showMessage('Today\'s appointments exported to Excel successfully!', 'success');
+}
+
+// Utility Functions
+// Utility Functions - Use the global showMessage from main.js
+// The showMessage function is already defined in main.js and uses the modern toast system
+
+</script>
+{% endblock %}

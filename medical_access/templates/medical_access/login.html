@@ -1,0 +1,91 @@
+{% extends 'medical_access/base.html' %} {% load static %} {% block title %}PayVerify - Login{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/login_page.css' %}" />
+{% endblock %} {% block auth_content %}
+<div class="login-page-left-side"></div>
+<div class="login-page-right-side">
+    <div class="login-page-right-side-container">
+        <div class="login-page-right-side-container-header">
+            <h3 class="login-page-right-side-container-header-title">Sign In</h3>
+            <p class="login-page-right-side-container-header-description">Please login account, to continue</p>
+        </div>
+
+        <div class="login-page-right-side-container-form">
+            <form id="loginForm">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="form-input-wrapper">
+                        <div class="form-input-icon"><i class="fa-solid fa-user"></i></div>
+                        <input type="text" id="username" name="username" class="form-input" placeholder="Enter your email" required />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="form-input-wrapper">
+                        <div class="form-input-icon">
+                            <i class="fa-solid fa-fingerprint"></i>
+                        </div>
+                        <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required />
+                        <button type="button" class="password-toggle" onclick="togglePassword()">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                                 <button type="submit" class="btn-primary form-button">Sign In</button>
+             </form>
+        </div>
+    </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+    // Password toggle functionality
+    function togglePassword() {
+        const passwordInput = document.getElementById("password");
+        const toggleButton = document.querySelector(".password-toggle i");
+
+        if (passwordInput.type === "password") {
+            passwordInput.type = "text";
+            toggleButton.className = "fa-solid fa-eye-slash";
+        } else {
+            passwordInput.type = "password";
+            toggleButton.className = "fa-solid fa-eye";
+        }
+    }
+
+    // Form submission
+    document.getElementById("loginForm").addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const formData = {
+            username: document.getElementById("username").value,
+            password: document.getElementById("password").value,
+        };
+
+                 try {
+             const response = await fetch('{% url "medical_access:login" %}', {
+                 method: "POST",
+                 headers: {
+                     "Content-Type": "application/json",
+                     "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                 },
+                 body: JSON.stringify(formData),
+             });
+
+             const data = await response.json();
+
+             if (data.success) {
+                 showMessage(data.message, "success");
+                 setTimeout(() => {
+                     window.location.href = '{% url "medical_access:dashboard" %}';
+                 }, 1000);
+             } else {
+                 showMessage(data.message, "error");
+             }
+         } catch (error) {
+             showMessage("An error occurred. Please try again.", "error");
+         }
+    });
+</script>
+{% endblock %}

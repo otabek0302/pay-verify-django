@@ -1,0 +1,449 @@
+{% extends 'medical_access/base.html' %}
+{% load static %}
+
+{% block title %}Scanner - PayVerify{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/kiosk.css' %}" />
+<style>
+    /* Hide sidebar on kiosk page */
+    .sidebar {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    .main-header {
+        display: none !important;
+    }
+    
+    /* Ensure full viewport height */
+    body {
+        overflow: hidden;
+    }
+    
+    .kiosk-container {
+        min-height: 100vh;
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kiosk-container">
+    <!-- Header Section -->
+    <div class="kiosk-header">
+        <div class="kiosk-back-button">
+            <a href="{% url 'medical_access:dashboard' %}" class="kiosk-back-link">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Dashboard</span>
+            </a>
+        </div>
+        <div class="kiosk-logo">
+            <i class="fas fa-qrcode"></i>
+            <span>PayVerify</span>
+        </div>
+        <div class="kiosk-subtitle">Medical Access Verification System</div>
+        <div class="kiosk-status" id="statusIndicator">
+            <i class="fas fa-circle"></i>
+            <span>Ready to Scan</span>
+        </div>
+    </div>
+
+    <!-- Main Scan Area -->
+    <div class="kiosk-main-content">
+        <div class="kiosk-scan-area" id="scanArea">
+            <div class="kiosk-scan-icon">
+                <i class="fas fa-qrcode"></i>
+            </div>
+            <div class="kiosk-scan-text">Scan your QR code to verify access</div>
+            <div class="kiosk-scan-subtitle">Position the QR code within the camera view</div>
+            <button class="kiosk-scan-button" id="startScanBtn">
+                <i class="fas fa-camera"></i>
+                <span>Start Camera</span>
+            </button>
+            
+            <!-- Manual Input Section -->
+            <div class="kiosk-manual-input" id="manualInput" style="display: none">
+                <div class="kiosk-divider">
+                    <span>or</span>
+                </div>
+                <div class="kiosk-manual-section">
+                    <div class="kiosk-manual-text">Enter QR code manually</div>
+                    <div class="kiosk-input-group">
+                        <input type="text" id="manualCodeInput" placeholder="Enter QR code..." class="kiosk-manual-input-field" />
+                        <button class="kiosk-verify-button" id="verifyManualBtn">
+                            <i class="fas fa-check"></i>
+                            <span>Verify</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Area -->
+        <div class="kiosk-camera-area" id="cameraArea" style="display: none">
+            <div class="kiosk-camera-header">
+                <div class="kiosk-camera-title">
+                    <i class="fas fa-video"></i>
+                    <span>Scanning QR Code</span>
+                </div>
+                <button class="kiosk-close-button" id="closeCameraBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="kiosk-camera-container">
+                <video id="video" autoplay playsinline></video>
+                <div class="kiosk-scan-overlay">
+                    <div class="kiosk-scan-frame"></div>
+                </div>
+            </div>
+            <div class="kiosk-camera-instruction">
+                <i class="fas fa-info-circle"></i>
+                <span>Position QR code within the frame</span>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="kiosk-loading" id="loading">
+            <div class="kiosk-loading-spinner"></div>
+            <div class="kiosk-loading-text">Processing QR code...</div>
+        </div>
+
+        <!-- Result Display -->
+        <div class="kiosk-result" id="result">
+            <div class="kiosk-result-icon" id="resultIcon"></div>
+            <div class="kiosk-result-text" id="resultText"></div>
+            <div class="kiosk-result-subtitle" id="resultSubtitle"></div>
+            <div class="kiosk-patient-info" id="patientInfo"></div>
+            <div class="kiosk-result-actions">
+                <button class="kiosk-action-button" id="scanAgainBtn">
+                    <i class="fas fa-redo"></i>
+                    <span>Scan Again</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="kiosk-footer">
+        <div class="kiosk-footer-text">
+            <i class="fas fa-shield-alt"></i>
+            <span>Secure Medical Access Verification</span>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+    const video = document.getElementById("video");
+    const scanArea = document.getElementById("scanArea");
+    const cameraArea = document.getElementById("cameraArea");
+    const startScanBtn = document.getElementById("startScanBtn");
+    const closeCameraBtn = document.getElementById("closeCameraBtn");
+    const result = document.getElementById("result");
+    const resultText = document.getElementById("resultText");
+    const resultSubtitle = document.getElementById("resultSubtitle");
+    const resultIcon = document.getElementById("resultIcon");
+    const patientInfo = document.getElementById("patientInfo");
+    const loading = document.getElementById("loading");
+    const manualInput = document.getElementById("manualInput");
+    const manualCodeInput = document.getElementById("manualCodeInput");
+    const verifyManualBtn = document.getElementById("verifyManualBtn");
+    const scanAgainBtn = document.getElementById("scanAgainBtn");
+    const statusIndicator = document.getElementById("statusIndicator");
+
+    let stream = null;
+    let scanning = false;
+
+    let isScanning = false;
+
+    startScanBtn.addEventListener("click", toggleScanning);
+    closeCameraBtn.addEventListener("click", stopScanning);
+    verifyManualBtn.addEventListener("click", verifyManualCode);
+    scanAgainBtn.addEventListener("click", startScanning);
+    manualCodeInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+            verifyManualCode();
+        }
+    });
+
+    function toggleScanning() {
+        if (isScanning) {
+            stopScanning();
+        } else {
+            startScanning();
+        }
+    }
+
+    async function startScanning() {
+        try {
+            startScanBtn.disabled = true;
+            startScanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Starting camera...</span>';
+            updateStatus("Starting camera...", "scanning");
+            hideResult();
+
+            // Check if camera API is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Camera API not supported. Please use HTTPS or localhost.");
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+            });
+
+            video.srcObject = stream;
+            scanArea.style.display = "none";
+            cameraArea.style.display = "block";
+
+            isScanning = true;
+            scanning = true;
+            updateStatus("Scanning...", "scanning");
+            requestAnimationFrame(scanQR);
+        } catch (err) {
+            showMessage("Camera not available. You can enter the QR code manually below.", "error");
+            startScanBtn.disabled = false;
+            startScanBtn.innerHTML = '<i class="fas fa-camera"></i><span>Start Camera</span>';
+            startScanBtn.classList.remove("stop");
+            isScanning = false;
+            updateStatus("Camera not available", "error");
+            manualInput.style.display = "block";
+        }
+    }
+
+    function stopScanning() {
+        isScanning = false;
+        scanning = false;
+
+        if (stream) {
+            stream.getTracks().forEach((track) => {
+                track.stop();
+            });
+            stream = null;
+        }
+
+        video.srcObject = null;
+        cameraArea.style.display = "none";
+        scanArea.style.display = "block";
+        startScanBtn.disabled = false;
+        startScanBtn.innerHTML = '<i class="fas fa-camera"></i><span>Start Camera</span>';
+        updateStatus("Ready to Scan", "ready");
+    }
+
+    function scanQR() {
+        if (!scanning) return;
+
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert"
+            });
+
+            if (code && code.data && code.data.length > 0) {
+                // Validate that it looks like a QR code (not a face)
+                // QR codes typically have alphanumeric data
+                const qrData = code.data.trim();
+                if (qrData.length >= 8 && /^[A-Z0-9]+$/.test(qrData)) {
+                    verifyQRCode(qrData);
+                    return;
+                }
+            }
+        }
+
+        requestAnimationFrame(scanQR);
+    }
+
+    async function verifyQRCode(qrData) {
+        scanning = false;
+        showLoading();
+
+        // Add a small delay to make scanning feel more natural
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        try {
+            const response = await fetch(`/medical_access/api/validate-qr/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    token: "776b7cfae1908878f78ba5a9084f660498feea87bb0c679492e97de3529a16a8",
+                    qr_code: qrData
+                })
+            });
+
+            const data = await response.json();
+            hideLoading();
+
+            if (data.success && data.valid) {
+                // Show success message based on status
+                if (data.message.includes("SUCCESS")) {
+                    showResult("SUCCESS", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("already")) {
+                    showResult("INFO", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("Patient Entered")) {
+                    showResult("SUCCESS", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else if (data.message.includes("Patient Left")) {
+                    showResult("INFO", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                } else {
+                    showResult("GRANTED", data.message, data.appointment.patient_name, data.appointment.patient_medical_card, true);
+                }
+            } else {
+                // Show error message
+                const errorMsg = data.message || "Invalid QR code";
+                showResult("DENIED", "Access Denied", errorMsg, "", false);
+            }
+
+            // Auto restart scanning after 5 seconds
+            setTimeout(() => {
+                hideResult();
+                if (!isScanning) {
+                    startScanning();
+                }
+            }, 5000);
+        } catch (err) {
+            hideLoading();
+            showMessage("Network error. Please try again.", "error");
+            setTimeout(() => {
+                if (!isScanning) {
+                    startScanning();
+                }
+            }, 3000);
+        }
+    }
+
+    function showResult(type, title, subtitle, procedure, granted) {
+        // Set CSS class based on result type
+        let resultClass = "kiosk-result";
+        if (type === "SUCCESS") {
+            resultClass += " success";
+        } else if (type === "INFO") {
+            resultClass += " info";
+        } else if (type === "GRANTED") {
+            resultClass += " granted";
+        } else {
+            resultClass += " denied";
+        }
+        
+        result.className = resultClass;
+        resultText.textContent = title;
+        resultSubtitle.textContent = subtitle || (granted ? "Access Granted" : "Access Denied");
+        
+        // Set appropriate icon based on type
+        if (type === "SUCCESS") {
+            resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else if (type === "INFO") {
+            resultIcon.innerHTML = '<i class="fas fa-info-circle"></i>';
+        } else if (type === "GRANTED") {
+            resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else {
+            resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
+        }
+
+        if (granted && subtitle) {
+            patientInfo.innerHTML = `
+                <div class="kiosk-patient-details">
+                    <div class="kiosk-patient-name">
+                        <i class="fas fa-user"></i>
+                        <span>${subtitle}</span>
+                    </div>
+                    ${procedure ? `
+                        <div class="kiosk-patient-procedure">
+                            <i class="fas fa-stethoscope"></i>
+                            <span>${procedure}</span>
+                        </div>
+                    ` : ""}
+                </div>
+            `;
+        } else {
+            patientInfo.innerHTML = `
+                <div class="kiosk-error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>${subtitle}</span>
+                </div>
+            `;
+        }
+
+        result.style.display = "block";
+        updateStatus(granted ? title : "Access Denied", granted ? "success" : "error");
+        stopScanning();
+    }
+
+    function hideResult() {
+        result.style.display = "none";
+    }
+
+    function showLoading() {
+        loading.style.display = "block";
+    }
+
+    function hideLoading() {
+        loading.style.display = "none";
+    }
+
+    function verifyManualCode() {
+        const code = manualCodeInput.value.trim();
+        if (!code) {
+            showMessage("Please enter a QR code.", "error");
+            return;
+        }
+        verifyQRCode(code);
+        manualCodeInput.value = "";
+    }
+
+    function updateStatus(message, type) {
+        const statusIcon = statusIndicator.querySelector('i');
+        const statusText = statusIndicator.querySelector('span');
+        
+        statusText.textContent = message;
+        statusIndicator.className = `kiosk-status ${type}`;
+        
+        if (type === 'success') {
+            statusIcon.className = 'fas fa-check-circle';
+        } else if (type === 'error') {
+            statusIcon.className = 'fas fa-times-circle';
+        } else if (type === 'scanning') {
+            statusIcon.className = 'fas fa-camera';
+        } else {
+            statusIcon.className = 'fas fa-circle';
+        }
+    }
+
+    function showMessage(message, type) {
+        // Enhanced message display with toast notification
+        const toast = document.createElement('div');
+        toast.className = `kiosk-toast ${type}`;
+        toast.innerHTML = `
+            <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+</script>
+{% endblock %}

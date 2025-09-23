@@ -1,0 +1,99 @@
+{% extends 'medical_access/base.html' %} 
+{% block title %}Dashboard - PayVerify{% endblock %} 
+{% block content %}
+<div class="dashboard-content">
+    <!-- Dashboard Header with Period Selector -->
+    <div class="dashboard-header">
+        <div class="dashboard-title">
+            <h1>Dashboard</h1>
+        </div>
+        <div class="dashboard-period-selector">
+            <label for="period-select" class="period-label">View Data:</label>
+            <select id="period-select" class="period-select">
+                <option value="today" {% if period == 'today' %}selected{% endif %}>Today</option>
+                <option value="week" {% if period == 'week' %}selected{% endif %}>This Week</option>
+                <option value="month" {% if period == 'month' %}selected{% endif %}>This Month</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Statistics Cards Section -->
+    <div class="dashboard-stats-grid">
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Appointments ({{ period_label }})</div>
+            <div class="dashboard-stat-card-value">{{ statistics.period_receipts }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Active QR Codes</div>
+            <div class="dashboard-stat-card-value">{{ statistics.active_appointments }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Total Patients</div>
+            <div class="dashboard-stat-card-value">{{ statistics.total_patients }}</div>
+        </div>
+        <div class="dashboard-stat-card">
+            <div class="dashboard-stat-card-title">Success Rate</div>
+            <div class="dashboard-stat-card-value">
+                {% if statistics.period_receipts > 0 %}
+                    {{ statistics.active_appointments|floatformat:1 }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Appointments Section -->
+    <div class="dashboard-appointments">
+        <div class="appointments-body">
+            <table class="appointments-table">
+                <thead class="table-head">
+                    <tr class="table-row">
+                        <th class="table-header">Appointment ID</th>
+                        <th class="table-header">Date</th>
+                        <th class="table-header">Patient</th>
+                        <th class="table-header">Medical Card</th>
+                        <th class="table-header">Status</th>
+                        <th class="table-header">Action</th>
+                    </tr>
+                </thead>
+                            <tbody class="table-body">
+                {% for appointment in latest_appointments %}
+                <tr class="table-row">
+                    <td class="table-cell">#APT{{ appointment.id|stringformat:"03d" }}</td>
+                    <td class="table-cell">{{ appointment.created_at|date:"M d, Y" }}</td>
+                    <td class="table-cell">{{ appointment.patient.full_name }}</td>
+                    <td class="table-cell">{{ appointment.patient.medical_card_number }}</td>
+                    <td class="table-cell">
+                        <span class="status-badge status-badge--{{ appointment.qr_code.status }}">{{ appointment.qr_code.get_status_display }}</span>
+                    </td>
+                    <td class="table-cell">
+                        <a href="{% url 'medical_access:appointment_detail' appointment.id %}" class="table-link">View Details</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="table-row">
+                    <td colspan="6" class="table-cell" style="text-align: center; color: var(--text-secondary); padding: 40px;">No appointments found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodSelect = document.getElementById('period-select');
+    
+    if (periodSelect) {
+        periodSelect.addEventListener('change', function() {
+            const selectedPeriod = this.value;
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('period', selectedPeriod);
+            window.location.href = currentUrl.toString();
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,612 @@
+{% extends 'medical_access/base.html' %}
+{% load static %}
+{% now "U" as timestamp %}
+
+{% block title %}Appointments - PayVerify{% endblock %}
+
+{% block content %}
+<!-- Global CSRF Token for AJAX requests -->
+{% csrf_token %}
+<div class="appointments-page">
+    <div class="appointments-page-header">
+        <h1 class="appointments-page-title">Latest Receipts</h1>
+        <div class="appointments-page-actions">
+            <a href="{% url 'medical_access:dashboard' %}" class="appointments-page-btn appointments-page-btn--secondary">Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <!-- Filter and Search Controls -->
+    <div class="appointments-filters">
+        <div class="appointments-filter-buttons">
+            <button class="appointments-filter-btn appointments-filter-btn--active" data-status="all">All</button>
+            <button class="appointments-filter-btn" data-status="active">Paid</button>
+            <button class="appointments-filter-btn" data-status="enter">Entered</button>
+            <button class="appointments-filter-btn" data-status="leave">Came out</button>
+        </div>
+        <div class="appointments-search-controls">
+            <div class="appointments-search-input">
+                <input type="text" id="appointments-search" class="appointments-input" placeholder="Search by name/medical card">
+            </div>
+            <button class="appointments-action-btn appointments-action-btn--search" onclick="searchAppointments()">Search</button>
+            <div class="appointments-period-select">
+                <select id="appointments-period" class="appointments-input">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+            </div>
+            <button class="appointments-action-btn appointments-action-btn--export" onclick="exportToCSV()">CSV Export</button>
+        </div>
+    </div>
+    
+    <div class="appointments-table-section">
+        <table class="appointments-table">
+            <thead class="appointments-table-head">
+                <tr class="appointments-table-row">
+                    <th class="appointments-table-header">ID</th>
+                    <th class="appointments-table-header">PATIENT</th>
+                    <th class="appointments-table-header">MEDICAL CARD</th>
+                    <th class="appointments-table-header">QR STATUS</th>
+                    <th class="appointments-table-header">ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody class="appointments-table-body">
+                {% for appointment in appointments %}
+                <tr class="appointments-table-row" data-appointment-id="{{ appointment.id }}">
+                    <td class="appointments-table-cell">{{ appointment.id }}</td>
+                    <td class="appointments-table-cell appointments-table-cell--patient">
+                        <div class="appointments-patient-info">
+                            <span class="appointments-patient-name">{{ appointment.patient.full_name }}</span>
+                        </div>
+                    </td>
+                    <td class="appointments-table-cell appointments-table-cell--medical-card">
+                        <span class="appointments-medical-card">{{ appointment.patient.medical_card_number }}</span>
+                    </td>
+                    <td class="appointments-table-cell appointments-table-cell--qr-status">
+                        {% if appointment.qr_code %}
+                            <span class="qr-status-badge qr-status-badge--{{ appointment.qr_code.status }}">
+                                {% if appointment.qr_code.status == 'active' %}
+                                    <i class="fas fa-check-circle"></i> Active
+                                {% elif appointment.qr_code.status == 'entered' %}
+                                    <i class="fas fa-door-open"></i> Entered
+                                {% elif appointment.qr_code.status == 'left' %}
+                                    <i class="fas fa-door-closed"></i> Left
+                                {% elif appointment.qr_code.status == 'expired' %}
+                                    <i class="fas fa-clock"></i> Expired
+                                {% else %}
+                                    <i class="fas fa-question-circle"></i> {{ appointment.qr_code.get_status_display }}
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="qr-status-badge qr-status-badge--none">
+                                <i class="fas fa-times-circle"></i> No QR
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="appointments-table-cell">
+                        <div class="appointments-actions">
+                            <a href="{% url 'medical_access:appointment_detail' appointment.id %}" 
+                               class="appointments-action-btn appointments-action-btn--open" target="_blank">Open</a>
+                            <button onclick="editAppointment({{ appointment.id }})" 
+                                    class="appointments-action-btn appointments-action-btn--edit">Edit</button>
+                            <button onclick="deleteAppointment({{ appointment.id }})" 
+                                    class="appointments-action-btn appointments-action-btn--delete">Delete</button>
+                            <a href="{% url 'medical_access:generate_receipt' appointment.id %}" 
+                               class="appointments-action-btn appointments-action-btn--print" target="_blank">Print</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="appointments-table-row">
+                    <td colspan="5" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} appointments
+        </div>
+        <div class="pagination">
+            <div class="pagination-numbers">
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <span class="pagination-link pagination-link--current">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="?page={{ num }}" class="pagination-link">{{ num }}</a>
+                    {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                        <span class="pagination-ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="pagination-nav">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="pagination-link pagination-link--prev">‹ Previous</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="pagination-link pagination-link--next">Next ›</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Appointment Modal -->
+<div id="editAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Edit Appointment</h2>
+            <button class="modal-close" onclick="closeEditAppointmentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="editAppointmentForm" class="modal-form">
+                {% csrf_token %}
+                <input type="hidden" id="edit_appointment_id" name="appointment_id">
+                
+                <div class="modal-form-row">
+                    <div class="modal-form-group">
+                        <label for="edit_first_name" class="modal-form-label">First Name *</label>
+                        <input type="text" id="edit_first_name" name="first_name" class="modal-form-input" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="edit_last_name" class="modal-form-label">Last Name *</label>
+                        <input type="text" id="edit_last_name" name="last_name" class="modal-form-input" required>
+                    </div>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="edit_medical_card_number" class="modal-form-label">Medical Card Number *</label>
+                    <input type="text" id="edit_medical_card_number" name="medical_card_number" class="modal-form-input" required>
+                </div>
+                
+                <div class="modal-form-group">
+                    <label for="edit_qr_status" class="modal-form-label">QR Status</label>
+                    <select id="edit_qr_status" name="qr_status" class="modal-form-select">
+                        <option value="">— Select Status —</option>
+                        <option value="active">Active</option>
+                        <option value="entered">Entered</option>
+                        <option value="left">Left</option>
+                        <option value="expired">Expired</option>
+                    </select>
+                </div>
+                
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn--secondary" onclick="closeEditAppointmentModal()">Cancel</button>
+            <button type="button" class="modal-btn modal-btn--primary" onclick="submitEditAppointment()">Update Appointment</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Delete Appointment</h2>
+            <button class="modal-close" onclick="closeDeleteAppointmentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this appointment?</p>
+            <p><strong id="deleteAppointmentInfo"></strong></p>
+            <p class="modal-warning">This action cannot be undone!</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn--secondary" onclick="closeDeleteAppointmentModal()">Cancel</button>
+            <button type="button" class="modal-btn modal-btn--danger" onclick="confirmDeleteAppointment()">Delete Appointment</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAppointmentId = null;
+
+// View Appointment Function
+function viewAppointment(appointmentId) {
+    // Redirect to appointment detail page
+    window.location.href = `/medical_access/appointment/${appointmentId}/`;
+}
+
+// Edit Appointment Functions
+function editAppointment(appointmentId) {
+    currentAppointmentId = appointmentId;
+    
+    // Get appointment data from the table row
+    const row = document.querySelector(`tr[data-appointment-id="${appointmentId}"]`);
+    
+    if (!row) {
+        console.error('Row not found for appointment ID:', appointmentId);
+        showMessage('Appointment row not found', 'error');
+        return;
+    }
+    
+    // Populate the edit form with current values
+    document.getElementById('edit_appointment_id').value = appointmentId;
+    
+    // Set patient name fields
+    const patientNameEl = row.querySelector('.appointments-patient-name');
+    if (!patientNameEl) {
+        console.error('Patient name element not found');
+        showMessage('Patient name element not found', 'error');
+        return;
+    }
+    const patientName = patientNameEl.textContent.trim();
+    
+    // Split the patient name into first and last name
+    const nameParts = patientName.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    document.getElementById('edit_first_name').value = firstName;
+    document.getElementById('edit_last_name').value = lastName;
+    
+    // Set medical card number
+    const medicalCardEl = row.querySelector('.appointments-medical-card');
+    if (medicalCardEl) {
+        document.getElementById('edit_medical_card_number').value = medicalCardEl.textContent.trim();
+    }
+    
+    // Set QR status
+    const qrStatusEl = row.querySelector('.qr-status-badge');
+    if (qrStatusEl) {
+        const qrStatusText = qrStatusEl.textContent.trim().toLowerCase();
+        const qrStatusSelect = document.getElementById('edit_qr_status');
+        if (qrStatusSelect) {
+            // Map display text to status values
+            const statusMap = {
+                'active': 'active',
+                'entered': 'entered',
+                'left': 'left',
+                'expired': 'expired'
+            };
+            
+            const statusValue = statusMap[qrStatusText] || qrStatusText;
+            qrStatusSelect.value = statusValue;
+        }
+    }
+    
+    // QR code is auto-generated, no need to set it
+    
+    // Show the modal
+    document.getElementById('editAppointmentModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeEditAppointmentModal() {
+    document.getElementById('editAppointmentModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    currentAppointmentId = null;
+}
+
+function submitEditAppointment() {
+    if (!currentAppointmentId) {
+        showMessage('No appointment selected for editing', 'error');
+        return;
+    }
+    
+    const form = document.getElementById('editAppointmentForm');
+    const formData = new FormData(form);
+    
+    fetch(`{% url "medical_access:update_appointment" 0 %}`.replace('0', currentAppointmentId), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeEditAppointmentModal();
+            
+            // Update the table row with new data
+            updateAppointmentRow(data.appointment);
+        } else {
+            showMessage(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error updating appointment: ' + error.message, 'error');
+    });
+}
+
+function updateAppointmentRow(appointmentData) {
+    const row = document.querySelector(`tr[data-appointment-id="${appointmentData.id}"]`);
+    if (!row) return;
+    
+    // Update patient name
+    const patientNameEl = row.querySelector('.appointments-patient-name');
+    if (patientNameEl) {
+        patientNameEl.textContent = appointmentData.patient_name;
+    }
+    
+    // Update doctor name
+    const doctorNameEl = row.querySelector('.appointments-doctor-name');
+    if (doctorNameEl) {
+        doctorNameEl.textContent = appointmentData.doctor_name;
+    }
+    
+    // Update procedure
+    const procedureEl = row.querySelector('.appointments-procedure-title');
+    if (procedureEl) {
+        procedureEl.textContent = appointmentData.doctor_procedure;
+    }
+    
+    // Update price
+    const priceEl = row.querySelector('.appointments-price');
+    if (priceEl) {
+        priceEl.textContent = appointmentData.doctor_price + ' sum';
+    }
+    
+    // Update status
+    const statusBadge = row.querySelector('.status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = appointmentData.status;
+        statusBadge.className = 'status-badge status-badge--' + appointmentData.status.toLowerCase();
+    }
+    
+    // Update QR code
+    const qrCodeEl = row.querySelector('.appointments-qr-code');
+    if (qrCodeEl) {
+        qrCodeEl.textContent = appointmentData.qr_code;
+    }
+    
+    // Update validity dates if available
+    if (appointmentData.valid_from) {
+        const validFromEl = row.querySelector('.appointments-valid-from');
+        if (validFromEl) {
+            const date = new Date(appointmentData.valid_from);
+            validFromEl.textContent = date.toLocaleString();
+        }
+    }
+    
+    if (appointmentData.valid_till) {
+        const validTillEl = row.querySelector('.appointments-valid-till');
+        if (validTillEl) {
+            const date = new Date(appointmentData.valid_till);
+            validTillEl.textContent = date.toLocaleString();
+        }
+    }
+}
+
+// Delete Appointment Functions
+function deleteAppointment(appointmentId) {
+    try {
+        currentAppointmentId = appointmentId;
+        
+        // Get appointment info for confirmation
+        const row = document.querySelector(`tr[data-appointment-id="${appointmentId}"]`);
+        if (!row) {
+            showMessage('Appointment row not found', 'error');
+            return;
+        }
+        
+        const patientNameEl = row.querySelector('.appointments-patient-name');
+        const medicalCardEl = row.querySelector('.appointments-medical-card');
+        const appointmentIdEl = row.querySelector('td:first-child');
+        
+        // Safely get text content
+        const patientName = patientNameEl ? patientNameEl.textContent.trim() : 'Unknown';
+        const medicalCard = medicalCardEl ? medicalCardEl.textContent.trim() : 'Unknown';
+        const appointmentIdText = appointmentIdEl ? appointmentIdEl.textContent.trim() : appointmentId;
+        
+        const deleteInfoEl = document.getElementById('deleteAppointmentInfo');
+        if (deleteInfoEl) {
+            deleteInfoEl.innerHTML = 
+                `ID: ${appointmentIdText}<br>Patient: ${patientName}<br>Medical Card: ${medicalCard}`;
+        }
+        
+        const modalEl = document.getElementById('deleteAppointmentModal');
+        if (modalEl) {
+            modalEl.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        } else {
+            showMessage('Delete modal not found', 'error');
+        }
+        
+    } catch (error) {
+        showMessage('Error opening delete confirmation: ' + error.message, 'error');
+    }
+}
+
+function closeDeleteAppointmentModal() {
+    const modalEl = document.getElementById('deleteAppointmentModal');
+    if (modalEl) {
+        modalEl.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    currentAppointmentId = null;
+}
+
+function confirmDeleteAppointment() {
+    if (!currentAppointmentId) {
+        showMessage('No appointment selected for deletion', 'error');
+        return;
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        showMessage('CSRF token not found. Please refresh the page.', 'error');
+        return;
+    }
+    
+    const deleteUrl = `{% url "medical_access:delete_appointment" 0 %}`.replace('0', currentAppointmentId);
+    
+    fetch(deleteUrl, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeDeleteAppointmentModal();
+            // Remove the row from the table
+            const row = document.querySelector(`tr[data-appointment-id="${currentAppointmentId}"]`);
+            if (row) {
+                row.remove();
+            }
+            // Check if table is empty
+            const tbody = document.querySelector('tbody');
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = '<tr class="appointments-table-row"><td colspan="5" class="appointments-table-cell appointments-table-cell--empty">No appointments found</td></tr>';
+            }
+        } else {
+            showMessage(data.message || 'Failed to delete appointment', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Delete error:', error);
+        showMessage('Error deleting appointment: ' + error.message, 'error');
+    });
+}
+
+// Filter and Search Functions
+function searchAppointments() {
+    const searchTerm = document.getElementById('appointments-search').value.toLowerCase();
+    const statusFilter = document.querySelector('.appointments-filter-btn--active').dataset.status;
+    
+    const rows = document.querySelectorAll('.appointments-table-row[data-appointment-id]');
+    
+    rows.forEach(row => {
+        const patientNameEl = row.querySelector('.appointments-patient-name');
+        const medicalCardEl = row.querySelector('.appointments-medical-card');
+        const qrStatusEl = row.querySelector('.qr-status-badge');
+        
+        const patientName = patientNameEl ? patientNameEl.textContent.toLowerCase() : '';
+        const medicalCard = medicalCardEl ? medicalCardEl.textContent.toLowerCase() : '';
+        const qrStatus = qrStatusEl ? qrStatusEl.textContent.toLowerCase() : '';
+        
+        let showRow = true;
+        
+        // Search filter
+        if (searchTerm && !patientName.includes(searchTerm) && !medicalCard.includes(searchTerm)) {
+            showRow = false;
+        }
+        
+        // QR Status filter
+        if (statusFilter !== 'all') {
+            if (statusFilter === 'active' && !qrStatus.includes('active')) showRow = false;
+            if (statusFilter === 'enter' && !qrStatus.includes('entered')) showRow = false;
+            if (statusFilter === 'leave' && !qrStatus.includes('left')) showRow = false;
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+    });
+}
+
+function exportToCSV() {
+    const rows = document.querySelectorAll('.appointments-table-row[data-appointment-id]');
+    const period = document.getElementById('appointments-period').value;
+    const today = new Date();
+    let periodLabel = '';
+    
+    // Calculate date range based on period
+    let startDate, endDate;
+    switch(period) {
+        case 'today':
+            startDate = new Date(today);
+            endDate = new Date(today);
+            periodLabel = 'today';
+            break;
+        case 'week':
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - today.getDay()); // Start of week
+            endDate = new Date(today);
+            endDate.setDate(today.getDate() + (6 - today.getDay())); // End of week
+            periodLabel = 'this_week';
+            break;
+        case 'month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1); // Start of month
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of month
+            periodLabel = 'this_month';
+            break;
+    }
+    
+    let csv = 'ID,Patient,Procedure,Doctor,Sum,Status\n';
+    
+    rows.forEach(row => {
+        if (row.style.display !== 'none') {
+            const id = row.cells[0] ? row.cells[0].textContent : '';
+            const patientEl = row.querySelector('.appointments-patient-name');
+            const medicalCardEl = row.querySelector('.appointments-medical-card');
+            const statusEl = row.querySelector('.status-badge');
+            
+            const patient = patientEl ? patientEl.textContent : 'Unknown';
+            const medicalCard = medicalCardEl ? medicalCardEl.textContent : 'Unknown';
+            const status = statusEl ? statusEl.textContent : 'Unknown';
+            
+            csv += `${id},"${patient}","${medicalCard}","N/A","N/A","${status}"\n`;
+        }
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `appointments_${periodLabel}_${today.toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    showMessage(`${period.charAt(0).toUpperCase() + period.slice(1)} appointments exported successfully!`, 'success');
+}
+
+// Filter button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const filterButtons = document.querySelectorAll('.appointments-filter-btn');
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove active class from all buttons
+            filterButtons.forEach(btn => btn.classList.remove('appointments-filter-btn--active'));
+            // Add active class to clicked button
+            this.classList.add('appointments-filter-btn--active');
+            // Trigger search
+            searchAppointments();
+        });
+    });
+    
+    // Search input functionality
+    const searchInput = document.getElementById('appointments-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', searchAppointments);
+    }
+});
+
+// Utility Functions - Use the global showMessage from main.js
+// The showMessage function is already defined in main.js and uses the modern toast system
+
+// Add event listener for edit form
+document.addEventListener('DOMContentLoaded', function() {
+    const editForm = document.getElementById('editAppointmentForm');
+    if (editForm) {
+        editForm.addEventListener('submit', submitEditAppointment);
+    }
+});
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('appointments-modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+
