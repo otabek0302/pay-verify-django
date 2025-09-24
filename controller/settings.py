@@ -18,10 +18,8 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", "django-insecure-secret-key")
 DEBUG = env("DEBUG", "True").lower() == "true"  # Default to True for development
 
 # Host configuration
-HOST_IP = env("HOST_IP", "localhost")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS", f"{HOST_IP},localhost,127.0.0.1,0.0.0.0").split(
-    ","
-)
+HOST_IP = env("HOST_IP", "192.168.139.81")
+ALLOWED_HOSTS = env("ALLOWED_HOSTS", "192.168.139.81,localhost,127.0.0.1,0.0.0.0").split(",")
 
 # Proxy configuration for Docker/Nginx
 USE_X_FORWARDED_HOST = True
@@ -54,7 +52,7 @@ else:
 # CSRF Configuration - only for browser use, not for terminals
 CSRF_TRUSTED_ORIGINS = env(
     "CSRF_TRUSTED_ORIGINS",
-    f"http://{HOST_IP},https://{HOST_IP},http://localhost,https://localhost,http://0.0.0.0:8000",
+    "http://192.168.139.81,https://192.168.139.81,http://localhost,https://localhost",
 ).split(",")
 
 # Application definition
@@ -73,14 +71,12 @@ INSTALLED_APPS = [
 ]
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "https://mis.dmed.uz",
-    "chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh",
-    "http://localhost",
-    "http://127.0.0.1",
-    "https://localhost",
-]
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "https://mis.dmed.uz,http://192.168.139.81,https://192.168.139.81,chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh").split(",")
+
+# Debugging CORS settings
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = False
+CORS_ALLOW_HEADERS = ["*"]
 
 # Allow Chrome Extension origin via regex (django-cors-headers)
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -89,17 +85,6 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 # Additional CORS settings for API endpoints
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
 
 # Ensure CORS middleware is first
 MIDDLEWARE = [
