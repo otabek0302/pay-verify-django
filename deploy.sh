@@ -96,13 +96,13 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s/^HOST_IP=.*$/HOST_IP=${DETECTED_IP}/" .env
     sed -i '' "s/^ALLOWED_HOSTS=.*$/ALLOWED_HOSTS=${DETECTED_IP},localhost,127.0.0.1/" .env
     sed -i '' "s|^CSRF_TRUSTED_ORIGINS=.*$|CSRF_TRUSTED_ORIGINS=http://${DETECTED_IP},https://${DETECTED_IP}|" .env
-    sed -i '' "s|^CORS_ALLOWED_ORIGINS=.*$|CORS_ALLOWED_ORIGINS=https://mis.dmed.uz,https://${DETECTED_IP},http://${DETECTED_IP},chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh|" .env
+    sed -i '' "s|^CORS_ALLOWED_ORIGINS=.*$|CORS_ALLOWED_ORIGINS=https://mis.dmed.uz,https://${DETECTED_IP},http://${DETECTED_IP}|" .env
 else
     # Linux sed
     sed -i "s/^HOST_IP=.*$/HOST_IP=${DETECTED_IP}/" .env
     sed -i "s/^ALLOWED_HOSTS=.*$/ALLOWED_HOSTS=${DETECTED_IP},localhost,127.0.0.1/" .env
     sed -i "s|^CSRF_TRUSTED_ORIGINS=.*$|CSRF_TRUSTED_ORIGINS=http://${DETECTED_IP},https://${DETECTED_IP}|" .env
-    sed -i "s|^CORS_ALLOWED_ORIGINS=.*$|CORS_ALLOWED_ORIGINS=https://mis.dmed.uz,https://${DETECTED_IP},http://${DETECTED_IP},chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh|" .env
+    sed -i "s|^CORS_ALLOWED_ORIGINS=.*$|CORS_ALLOWED_ORIGINS=https://mis.dmed.uz,https://${DETECTED_IP},http://${DETECTED_IP}|" .env
 fi
 
 log_success "Environment configured for IP: $DETECTED_IP"
