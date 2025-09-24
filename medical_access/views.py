@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import timezone as dt_timezone
 from django.core.paginator import Paginator
@@ -40,6 +41,7 @@ def home_view(request):
     return redirect("medical_access:login")
 
 
+@csrf_exempt
 def login_view(request):
     """Login view"""
     if request.user.is_authenticated:

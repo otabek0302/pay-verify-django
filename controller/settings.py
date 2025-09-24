@@ -47,9 +47,11 @@ if not DEBUG:
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 else:
-    # Development settings
+    # Development settings - Disable security headers for HTTP development
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None
     SECURE_REFERRER_POLICY = None
+    # Disable COOP for Chrome Extension compatibility
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 # CSRF Configuration - only for browser use, not for terminals
 CSRF_TRUSTED_ORIGINS = env(
@@ -80,8 +82,18 @@ CORS_ALLOWED_ORIGINS = env(
 
 # Debugging CORS settings
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOW_CREDENTIALS = False
-CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_CREDENTIALS = True  # Enable credentials for Chrome Extension
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding", 
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
 
 # Allow Chrome Extension origin via regex (django-cors-headers)
 CORS_ALLOWED_ORIGIN_REGEXES = [
