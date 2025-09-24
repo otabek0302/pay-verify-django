@@ -33,6 +33,10 @@ services:
       - USE_POSTGRES=True
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
       - DEBUG=${DEBUG:-True}
+      - HOST_IP=${HOST_IP:-192.168.139.81}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://mis.dmed.uz,http://192.168.139.81,https://192.168.139.81,chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-192.168.139.81,localhost,127.0.0.1,0.0.0.0}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://192.168.139.81,https://192.168.139.81,http://localhost,https://localhost}
     depends_on:
       db:
         condition: service_healthy

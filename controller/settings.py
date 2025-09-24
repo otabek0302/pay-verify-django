@@ -19,7 +19,9 @@ DEBUG = env("DEBUG", "True").lower() == "true"  # Default to True for developmen
 
 # Host configuration
 HOST_IP = env("HOST_IP", "192.168.139.81")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS", "192.168.139.81,localhost,127.0.0.1,0.0.0.0").split(",")
+ALLOWED_HOSTS = env(
+    "ALLOWED_HOSTS", "192.168.139.81,localhost,127.0.0.1,0.0.0.0"
+).split(",")
 
 # Proxy configuration for Docker/Nginx
 USE_X_FORWARDED_HOST = True
@@ -71,7 +73,10 @@ INSTALLED_APPS = [
 ]
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS", "https://mis.dmed.uz,http://192.168.139.81,https://192.168.139.81,chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh").split(",")
+CORS_ALLOWED_ORIGINS = env(
+    "CORS_ALLOWED_ORIGINS",
+    "https://mis.dmed.uz,http://192.168.139.81,https://192.168.139.81,chrome-extension://peifjgpicbnlpobobglipjgbmpkmcafh",
+).split(",")
 
 # Debugging CORS settings
 CORS_ALLOW_ALL_ORIGINS = False
